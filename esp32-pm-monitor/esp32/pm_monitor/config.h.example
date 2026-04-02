@@ -1,0 +1,21 @@
+#pragma once
+
+// ─── WiFi ────────────────────────────────────────────────────────────────────
+#define WIFI_SSID     "your_wifi_ssid"
+#define WIFI_PASSWORD "your_wifi_password"
+
+// ─── Backend ─────────────────────────────────────────────────────────────────
+// Full URL of your deployed backend, no trailing slash
+// e.g. "https://pm-monitor.onrender.com" or "http://192.168.1.100:8000"
+#define SERVER_URL    "https://your-backend.onrender.com"
+
+// API key – must match API_KEY env-var on the server
+#define API_KEY       "change-me-secret-key"
+
+// ─── PMS7003 UART pins (ESP32 Hardware Serial 2) ─────────────────────────────
+#define PMS_RX_PIN    16   // ESP32 pin connected to PMS7003 TX
+#define PMS_TX_PIN    17   // ESP32 pin connected to PMS7003 RX
+
+// ─── Defaults ────────────────────────────────────────────────────────────────
+// Default sampling interval in seconds (overridden by server config)
+#define DEFAULT_INTERVAL_SEC  1800   // 30 minutes

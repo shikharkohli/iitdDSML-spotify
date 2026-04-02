@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="midnight">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PM Monitor</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <style>
+/* ════════════════════════════════════════════════════════════
+   THEMES
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Midnight (default dark) ── */
+[data-theme="midnight"] {
+  --bg:        #0f1117;
+  --bg2:       #1a1d27;
+  --surface:   #1e2130;
+  --border:    #2d3148;
+  --text:      #e2e8f0;
+  --muted:     #94a3b8;
+  --accent:    #4f8ef7;
+  --accent2:   #7c3aed;
+  --green:     #34d399;
+  --yellow:    #fbbf24;
+  --red:       #f87171;
+  --purple:    #a78bfa;
+  --card-glow: 0 4px 24px rgba(79,142,247,.08);
+  --header-bg: rgba(26,29,39,.9);
+}
+
+/* ── Aurora (teal/green) ── */
+[data-theme="aurora"] {
+  --bg:        #071a13;
+  --bg2:       #0d2b1d;
+  --surface:   #112e1f;
+  --border:    #1b4332;
+  --text:      #d1fae5;
+  --muted:     #6ee7b7;
+  --accent:    #10b981;
+  --accent2:   #059669;
+  --green:     #6ee7b7;
+  --yellow:    #fde68a;
+  --red:       #fca5a5;
+  --purple:    #a78bfa;
+  --card-glow: 0 4px 24px rgba(16,185,129,.1);
+  --header-bg: rgba(7,26,19,.9);
+}
+
+/* ── Sunset (warm orange/pink) ── */
+[data-theme="sunset"] {
+  --bg:        #1a0a0a;
+  --bg2:       #2a1010;
+  --surface:   #2d1515;
+  --border:    #5a2424;
+  --text:      #fde8d0;
+  --muted:     #f0a07a;
+  --accent:    #fb923c;
+  --accent2:   #e11d48;
+  --green:     #86efac;
+  --yellow:    #fde047;
+  --red:       #f87171;
+  --purple:    #c4b5fd;
+  --card-glow: 0 4px 24px rgba(251,146,60,.1);
+  --header-bg: rgba(26,10,10,.9);
+}
+
+/* ── Ocean (deep blue) ── */
+[data-theme="ocean"] {
+  --bg:        #050d1a;
+  --bg2:       #0c1a2e;
+  --surface:   #0f2040;
+  --border:    #1e3a5f;
+  --text:      #cce7ff;
+  --muted:     #7ab3d4;
+  --accent:    #38bdf8;
+  --accent2:   #0ea5e9;
+  --green:     #6ee7b7;
+  --yellow:    #fde68a;
+  --red:       #fca5a5;
+  --purple:    #c4b5fd;
+  --card-glow: 0 4px 24px rgba(56,189,248,.1);
+  --header-bg: rgba(5,13,26,.9);
+}
+
+/* ── Rose Quartz (soft pink) ── */
+[data-theme="rose"] {
+  --bg:        #1a0d14;
+  --bg2:       #2a1320;
+  --surface:   #30162a;
+  --border:    #6b2147;
+  --text:      #fce7f3;
+  --muted:     #f9a8d4;
+  --accent:    #f472b6;
+  --accent2:   #ec4899;
+  --green:     #86efac;
+  --yellow:    #fde047;
+  --red:       #fca5a5;
+  --purple:    #d8b4fe;
+  --card-glow: 0 4px 24px rgba(244,114,182,.1);
+  --header-bg: rgba(26,13,20,.9);
+}
+
+/* ── Clean Light ── */
+[data-theme="light"] {
+  --bg:        #f8fafc;
+  --bg2:       #f1f5f9;
+  --surface:   #ffffff;
+  --border:    #e2e8f0;
+  --text:      #0f172a;
+  --muted:     #64748b;
+  --accent:    #2563eb;
+  --accent2:   #7c3aed;
+  --green:     #059669;
+  --yellow:    #d97706;
+  --red:       #dc2626;
+  --purple:    #7c3aed;
+  --card-glow: 0 2px 12px rgba(0,0,0,.07);
+  --header-bg: rgba(248,250,252,.95);
+}
+
+/* ── Cyberpunk (neon on black) ── */
+[data-theme="cyber"] {
+  --bg:        #000008;
+  --bg2:       #050510;
+  --surface:   #080820;
+  --border:    #1a1a40;
+  --text:      #f0f0ff;
+  --muted:     #8080c0;
+  --accent:    #00f0ff;
+  --accent2:   #ff00aa;
+  --green:     #00ff88;
+  --yellow:    #ffee00;
+  --red:       #ff3344;
+  --purple:    #cc44ff;
+  --card-glow: 0 0 20px rgba(0,240,255,.15), 0 0 60px rgba(0,240,255,.05);
+  --header-bg: rgba(0,0,8,.95);
+}
+
+/* ════════════════════════════════════════════════════════════
+   RESET & BASE
+   ════════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 16px; scroll-behavior: smooth; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  transition: background .3s, color .3s;
+}
+
+/* ════════════════════════════════════════════════════════════
+   HEADER
+   ════════════════════════════════════════════════════════════ */
+header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--header-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: .85rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+
+header h1 {
+  font-size: clamp(1.05rem, 3vw, 1.4rem);
+  font-weight: 800;
+  letter-spacing: -.03em;
+}
+header h1 .accent { color: var(--accent); }
+header h1 .dot     { color: var(--accent2); }
+
+/* theme picker */
+#theme-picker {
+  display: flex;
+  gap: .35rem;
+  flex-wrap: wrap;
+  margin-left: auto;
+  align-items: center;
+}
+
+.theme-swatch {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform .2s, border-color .2s;
+  position: relative;
+}
+.theme-swatch:hover       { transform: scale(1.25); }
+.theme-swatch.active      { border-color: var(--text); }
+.theme-swatch[data-t="midnight"] { background: linear-gradient(135deg,#0f1117,#4f8ef7); }
+.theme-swatch[data-t="aurora"]   { background: linear-gradient(135deg,#071a13,#10b981); }
+.theme-swatch[data-t="sunset"]   { background: linear-gradient(135deg,#1a0a0a,#fb923c); }
+.theme-swatch[data-t="ocean"]    { background: linear-gradient(135deg,#050d1a,#38bdf8); }
+.theme-swatch[data-t="rose"]     { background: linear-gradient(135deg,#1a0d14,#f472b6); }
+.theme-swatch[data-t="light"]    { background: linear-gradient(135deg,#f8fafc,#2563eb); }
+.theme-swatch[data-t="cyber"]    { background: linear-gradient(135deg,#000008,#00f0ff); }
+
+#status-pill {
+  padding: .25rem .7rem;
+  border-radius: 999px;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  background: var(--border);
+  color: var(--muted);
+  transition: background .3s, color .3s;
+}
+#status-pill.online  { background: rgba(52,211,153,.15); color: var(--green); }
+#status-pill.offline { background: rgba(248,113,113,.15); color: var(--red); }
+
+/* ════════════════════════════════════════════════════════════
+   MAIN LAYOUT
+   ════════════════════════════════════════════════════════════ */
+main {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 3rem;
+  display: grid;
+  gap: 1.1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 900px) {
+  main { grid-template-columns: 1fr 1fr; }
+  .full  { grid-column: 1 / -1; }
+}
+
+/* ════════════════════════════════════════════════════════════
+   CARDS
+   ════════════════════════════════════════════════════════════ */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.2rem 1.25rem;
+  box-shadow: var(--card-glow);
+  transition: background .3s, border-color .3s, box-shadow .3s;
+}
+
+[data-theme="cyber"] .card {
+  box-shadow: 0 0 0 1px var(--accent), var(--card-glow);
+}
+
+.card-title {
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: .9rem;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+.card-title::before {
+  content: "";
+  display: inline-block;
+  width: 3px; height: 14px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+/* ════════════════════════════════════════════════════════════
+   STATS GRID (latest reading)
+   ════════════════════════════════════════════════════════════ */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: .65rem;
+}
+
+.stat {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: .7rem .85rem;
+  display: flex;
+  flex-direction: column;
+  gap: .1rem;
+  transition: transform .15s, box-shadow .15s;
+}
+.stat:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0,0,0,.25);
+}
+.stat-label {
+  font-size: .63rem;
+  color: var(--muted);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.stat-value {
+  font-size: 1.45rem;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.stat-unit { font-size: .62rem; color: var(--muted); }
+
+/* colour classes */
+.good      { color: var(--green);  }
+.moderate  { color: var(--yellow); }
+.unhealthy { color: var(--red);    }
+.std       { color: var(--accent); }
+.atm       { color: var(--purple); }
+.cnt       { color: var(--muted);  }
+
+#last-updated {
+  font-size: .7rem;
+  color: var(--muted);
+  margin-top: .75rem;
+  text-align: right;
+  opacity: .8;
+}
+
+/* ════════════════════════════════════════════════════════════
+   CONTROLS (tabs, range)
+   ════════════════════════════════════════════════════════════ */
+.btn-row {
+  display: flex;
+  gap: .4rem;
+  flex-wrap: wrap;
+  margin-bottom: .8rem;
+}
+.pill-btn {
+  padding: .28rem .75rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: .75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.pill-btn:hover { border-color: var(--accent); color: var(--accent); }
+.pill-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+[data-theme="cyber"] .pill-btn.active {
+  box-shadow: 0 0 8px var(--accent);
+}
+
+/* ════════════════════════════════════════════════════════════
+   CHARTS
+   ════════════════════════════════════════════════════════════ */
+.chart-wrap {
+  position: relative;
+  width: 100%;
+  height: 240px;
+}
+@media (min-width: 640px)  { .chart-wrap { height: 290px; } }
+@media (min-width: 1200px) { .chart-wrap { height: 320px; } }
+
+/* ════════════════════════════════════════════════════════════
+   CONFIG
+   ════════════════════════════════════════════════════════════ */
+.config-section {
+  display: flex;
+  flex-direction: column;
+  gap: .85rem;
+}
+.config-row {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+.config-row label {
+  font-size: .82rem;
+  color: var(--muted);
+  min-width: 90px;
+}
+.config-row input[type=number] {
+  width: 90px;
+  padding: .4rem .65rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg2);
+  color: var(--text);
+  font-size: .9rem;
+  font-variant-numeric: tabular-nums;
+}
+.config-row input[type=number]:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.config-row input[type=range] {
+  flex: 1;
+  min-width: 100px;
+  accent-color: var(--accent);
+}
+#interval-display {
+  font-size: .82rem;
+  color: var(--accent);
+  font-weight: 700;
+  min-width: 65px;
+}
+
+.btn-primary {
+  padding: .42rem 1.1rem;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: .82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .2s, box-shadow .2s;
+}
+.btn-primary:hover { opacity: .88; }
+.btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+[data-theme="cyber"] .btn-primary { box-shadow: 0 0 12px var(--accent); }
+
+.preset-row {
+  display: flex;
+  gap: .4rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.preset-row span { font-size: .72rem; color: var(--muted); margin-right: .25rem; }
+
+#config-feedback {
+  font-size: .78rem;
+  min-height: 1.1rem;
+  padding-left: .1rem;
+}
+
+/* ════════════════════════════════════════════════════════════
+   AQI LEGEND
+   ════════════════════════════════════════════════════════════ */
+.aqi-legend {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+  margin-top: .6rem;
+}
+.aqi-chip {
+  font-size: .7rem;
+  padding: .18rem .55rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.aqi-chip.good      { background: rgba(52,211,153,.15); color: var(--green); }
+.aqi-chip.moderate  { background: rgba(251,191,36,.15);  color: var(--yellow); }
+.aqi-chip.unhealthy { background: rgba(248,113,113,.15); color: var(--red); }
+
+/* ════════════════════════════════════════════════════════════
+   SPINNER
+   ════════════════════════════════════════════════════════════ */
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .65s linear infinite;
+  display: none;
+  flex-shrink: 0;
+}
+.spinner.active { display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ════════════════════════════════════════════════════════════
+   CYBER SCANLINE EFFECT
+   ════════════════════════════════════════════════════════════ */
+[data-theme="cyber"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,240,255,.015) 2px,
+    rgba(0,240,255,.015) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+  </style>
+</head>
+
+<body>
+  <!-- ══ HEADER ══════════════════════════════════════════════════════════ -->
+  <header>
+    <h1>PM<span class="dot">·</span><span class="accent">Monitor</span></h1>
+    <div class="spinner" id="spinner"></div>
+    <span id="status-pill">—</span>
+
+    <!-- Theme swatches -->
+    <div id="theme-picker" title="Pick a theme">
+      <div class="theme-swatch active" data-t="midnight" title="Midnight"></div>
+      <div class="theme-swatch" data-t="aurora"   title="Aurora"></div>
+      <div class="theme-swatch" data-t="sunset"   title="Sunset"></div>
+      <div class="theme-swatch" data-t="ocean"    title="Ocean"></div>
+      <div class="theme-swatch" data-t="rose"     title="Rose Quartz"></div>
+      <div class="theme-swatch" data-t="light"    title="Light"></div>
+      <div class="theme-swatch" data-t="cyber"    title="Cyberpunk"></div>
+    </div>
+  </header>
+
+  <!-- ══ MAIN ════════════════════════════════════════════════════════════ -->
+  <main>
+
+    <!-- Latest values -->
+    <div class="card full">
+      <div class="card-title">Latest Reading</div>
+      <div class="stats-grid" id="stats">
+        <div class="stat"><div class="stat-label">Waiting…</div><div class="stat-value cnt">—</div></div>
+      </div>
+      <div class="aqi-legend">
+        <span class="aqi-chip good">Good ≤12 µg/m³</span>
+        <span class="aqi-chip moderate">Moderate ≤35</span>
+        <span class="aqi-chip unhealthy">&gt;35 Unhealthy</span>
+        <span style="font-size:.68rem;color:var(--muted);margin-left:auto;align-self:center">PM2.5 atm (US EPA)</span>
+      </div>
+      <div id="last-updated"></div>
+    </div>
+
+    <!-- PM chart -->
+    <div class="card full">
+      <div class="card-title">PM Concentration Over Time</div>
+      <div class="btn-row" id="range-row">
+        <button class="pill-btn" data-h="1">1 h</button>
+        <button class="pill-btn active" data-h="6">6 h</button>
+        <button class="pill-btn" data-h="24">24 h</button>
+        <button class="pill-btn" data-h="72">3 d</button>
+        <button class="pill-btn" data-h="168">7 d</button>
+        <button class="pill-btn" data-h="">All</button>
+      </div>
+      <div class="btn-row" id="tab-bar">
+        <button class="pill-btn active" data-mode="std">Standard (CF=1)</button>
+        <button class="pill-btn" data-mode="atm">Atmospheric</button>
+        <button class="pill-btn" data-mode="both">Both</button>
+      </div>
+      <div class="chart-wrap"><canvas id="pmChart"></canvas></div>
+    </div>
+
+    <!-- Particle count chart -->
+    <div class="card full">
+      <div class="card-title">Particle Counts per 0.1 L</div>
+      <div class="chart-wrap"><canvas id="cntChart"></canvas></div>
+    </div>
+
+    <!-- Config -->
+    <div class="card full">
+      <div class="card-title">Sampling Interval</div>
+      <div class="config-section">
+        <div class="preset-row">
+          <span>Presets:</span>
+          <button class="pill-btn" data-preset="60">1 min</button>
+          <button class="pill-btn" data-preset="300">5 min</button>
+          <button class="pill-btn" data-preset="600">10 min</button>
+          <button class="pill-btn active" data-preset="1800">30 min</button>
+          <button class="pill-btn" data-preset="3600">1 hr</button>
+        </div>
+        <div class="config-row">
+          <label>Seconds:</label>
+          <input type="number" id="interval-input" min="10" max="86400" value="1800" />
+          <input type="range"  id="interval-range" min="10" max="86400" step="10" value="1800" />
+          <span id="interval-display">30 min</span>
+          <button class="btn-primary" id="save-btn">Save</button>
+        </div>
+        <p id="config-feedback"></p>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+  (() => {
+    "use strict";
+
+    /* ── Theme ──────────────────────────────────────────────────────── */
+    const THEME_KEY = "pm_theme";
+    function applyTheme(t) {
+      document.documentElement.setAttribute("data-theme", t);
+      document.querySelectorAll(".theme-swatch").forEach(s =>
+        s.classList.toggle("active", s.dataset.t === t));
+      localStorage.setItem(THEME_KEY, t);
+      // Re-render charts with new grid colours
+      if (window._pmChart)  updateChartTheme(window._pmChart);
+      if (window._cntChart) updateChartTheme(window._cntChart);
+    }
+
+    function updateChartTheme(chart) {
+      const style = getComputedStyle(document.documentElement);
+      const gridColor   = style.getPropertyValue("--border").trim();
+      const mutedColor  = style.getPropertyValue("--muted").trim();
+      chart.options.scales.x.ticks.color = mutedColor;
+      chart.options.scales.x.grid.color  = gridColor;
+      chart.options.scales.y.ticks.color = mutedColor;
+      chart.options.scales.y.grid.color  = gridColor;
+      chart.options.plugins.legend.labels.color = style.getPropertyValue("--text").trim();
+      chart.update();
+    }
+
+    document.getElementById("theme-picker").addEventListener("click", e => {
+      const sw = e.target.closest(".theme-swatch");
+      if (sw) applyTheme(sw.dataset.t);
+    });
+
+    const savedTheme = localStorage.getItem(THEME_KEY) || "midnight";
+    applyTheme(savedTheme);
+
+    /* ── State ──────────────────────────────────────────────────────── */
+    let allData    = [];
+    let hoursRange = 6;
+    let pmMode     = "std";
+    const REFRESH_MS = 30_000;
+
+    /* ── Chart factory ──────────────────────────────────────────────── */
+    function makeChartOptions(yLabel) {
+      const style    = getComputedStyle(document.documentElement);
+      const grid     = style.getPropertyValue("--border").trim()  || "#2d3148";
+      const muted    = style.getPropertyValue("--muted").trim()   || "#94a3b8";
+      const textCol  = style.getPropertyValue("--text").trim()    || "#e2e8f0";
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        interaction: { mode: "index", intersect: false },
+        scales: {
+          x: {
+            type: "time",
+            time: { tooltipFormat: "MMM d, HH:mm" },
+            ticks: { color: muted, maxTicksLimit: 8 },
+            grid:  { color: grid },
+          },
+          y: {
+            title: { display: true, text: yLabel, color: muted },
+            ticks: { color: muted },
+            grid:  { color: grid },
+            beginAtZero: true,
+          },
+        },
+        plugins: {
+          legend: { labels: { color: textCol, boxWidth: 12, padding: 14 } },
+        },
+      };
+    }
+
+    window._pmChart = new Chart(
+      document.getElementById("pmChart"),
+      { type: "line", data: { datasets: [] }, options: makeChartOptions("µg/m³") }
+    );
+    window._cntChart = new Chart(
+      document.getElementById("cntChart"),
+      { type: "line", data: { datasets: [] }, options: makeChartOptions("count / 0.1 L") }
+    );
+
+    /* ── Helpers ────────────────────────────────────────────────────── */
+    function pts(data, key) {
+      return [...data].reverse().map(r => ({ x: new Date(r.ts * 1000), y: r[key] }));
+    }
+
+    function ds(label, data, key, color, dash=[]) {
+      return {
+        label,
+        data: pts(data, key),
+        borderColor: color,
+        backgroundColor: color + "22",
+        borderWidth: 2,
+        borderDash: dash,
+        pointRadius: data.length > 120 ? 0 : 3,
+        pointHoverRadius: 5,
+        tension: 0.3,
+        fill: false,
+      };
+    }
+
+    function pm25class(v) {
+      if (v <= 12)  return "good";
+      if (v <= 35)  return "moderate";
+      return "unhealthy";
+    }
+
+    function fmtSec(s) {
+      if (s < 60)   return `${s} sec`;
+      if (s < 3600) return `${Math.round(s/60)} min`;
+      return `${(s/3600).toFixed(1)} hr`;
+    }
+
+    /* ── Render charts ──────────────────────────────────────────────── */
+    function renderCharts() {
+      let d = allData;
+      if (hoursRange) {
+        const cut = Date.now()/1000 - hoursRange*3600;
+        d = d.filter(r => r.ts >= cut);
+      }
+      const sets = [];
+      if (pmMode === "std" || pmMode === "both") {
+        sets.push(ds("PM1.0 std",  d, "pm1_0_std",  "#a78bfa"));
+        sets.push(ds("PM2.5 std",  d, "pm2_5_std",  "#4f8ef7"));
+        sets.push(ds("PM10 std",   d, "pm10_std",   "#34d399"));
+      }
+      if (pmMode === "atm" || pmMode === "both") {
+        sets.push(ds("PM1.0 atm",  d, "pm1_0_atm",  "#c4b5fd", [4,2]));
+        sets.push(ds("PM2.5 atm",  d, "pm2_5_atm",  "#60a5fa", [4,2]));
+        sets.push(ds("PM10 atm",   d, "pm10_atm",   "#6ee7b7", [4,2]));
+      }
+      window._pmChart.data.datasets = sets;
+      window._pmChart.update();
+
+      window._cntChart.data.datasets = [
+        ds(">0.3 µm", d, "cnt_0_3um", "#f59e0b"),
+        ds(">0.5 µm", d, "cnt_0_5um", "#10b981"),
+        ds(">1.0 µm", d, "cnt_1_0um", "#3b82f6"),
+        ds(">2.5 µm", d, "cnt_2_5um", "#8b5cf6"),
+        ds(">5.0 µm", d, "cnt_5_0um", "#ec4899"),
+        ds(">10  µm", d, "cnt_10um",  "#f87171"),
+      ];
+      window._cntChart.update();
+    }
+
+    /* ── Render latest stats ────────────────────────────────────────── */
+    function renderStats(r) {
+      if (!r) return;
+      const items = [
+        { label:"PM1.0 std",  val:r.pm1_0_std,  unit:"µg/m³", cls:"std" },
+        { label:"PM2.5 std",  val:r.pm2_5_std,  unit:"µg/m³", cls:"std" },
+        { label:"PM10 std",   val:r.pm10_std,   unit:"µg/m³", cls:"std" },
+        { label:"PM1.0 atm",  val:r.pm1_0_atm,  unit:"µg/m³", cls:"atm" },
+        { label:"PM2.5 atm",  val:r.pm2_5_atm,  unit:"µg/m³", cls:pm25class(r.pm2_5_atm) },
+        { label:"PM10 atm",   val:r.pm10_atm,   unit:"µg/m³", cls:"atm" },
+        { label:">0.3 µm",    val:r.cnt_0_3um,  unit:"/0.1L", cls:"cnt" },
+        { label:">0.5 µm",    val:r.cnt_0_5um,  unit:"/0.1L", cls:"cnt" },
+        { label:">1.0 µm",    val:r.cnt_1_0um,  unit:"/0.1L", cls:"cnt" },
+        { label:">2.5 µm",    val:r.cnt_2_5um,  unit:"/0.1L", cls:"cnt" },
+        { label:">5.0 µm",    val:r.cnt_5_0um,  unit:"/0.1L", cls:"cnt" },
+        { label:">10  µm",    val:r.cnt_10um,   unit:"/0.1L", cls:"cnt" },
+      ];
+      document.getElementById("stats").innerHTML = items.map(i =>
+        `<div class="stat">
+           <div class="stat-label">${i.label}</div>
+           <div class="stat-value ${i.cls}">${i.val}</div>
+           <div class="stat-unit">${i.unit}</div>
+         </div>`
+      ).join("");
+      document.getElementById("last-updated").textContent =
+        "Last updated: " + new Date(r.ts * 1000).toLocaleString();
+    }
+
+    /* ── Fetch data ─────────────────────────────────────────────────── */
+    async function fetchData() {
+      setSpinner(true);
+      try {
+        const qs = hoursRange ? `?hours=${hoursRange}&limit=2000` : "?limit=2000";
+        const res = await fetch("/api/data" + qs);
+        if (!res.ok) throw new Error(res.status);
+        allData = await res.json();
+        const pill = document.getElementById("status-pill");
+        pill.textContent = allData.length ? "LIVE" : "NO DATA";
+        pill.className   = allData.length ? "online" : "";
+        renderStats(allData[0] || null);
+        renderCharts();
+      } catch (e) {
+        const pill = document.getElementById("status-pill");
+        pill.textContent = "OFFLINE";
+        pill.className   = "offline";
+      } finally {
+        setSpinner(false);
+      }
+    }
+
+    async function fetchConfig() {
+      try {
+        const res = await fetch("/api/config");
+        if (!res.ok) return;
+        const { interval_sec } = await res.json();
+        document.getElementById("interval-input").value = interval_sec;
+        document.getElementById("interval-range").value = interval_sec;
+        document.getElementById("interval-display").textContent = fmtSec(interval_sec);
+        highlightPreset(interval_sec);
+      } catch (_) {}
+    }
+
+    /* ── UI helpers ─────────────────────────────────────────────────── */
+    function setSpinner(on) {
+      document.getElementById("spinner").classList.toggle("active", on);
+    }
+
+    function highlightPreset(sec) {
+      document.querySelectorAll("[data-preset]").forEach(b =>
+        b.classList.toggle("active", parseInt(b.dataset.preset,10) === sec)
+      );
+    }
+
+    /* ── Event listeners ────────────────────────────────────────────── */
+    document.getElementById("range-row").addEventListener("click", e => {
+      const b = e.target.closest(".pill-btn");
+      if (!b) return;
+      document.querySelectorAll("#range-row .pill-btn").forEach(x => x.classList.remove("active"));
+      b.classList.add("active");
+      hoursRange = b.dataset.h ? parseFloat(b.dataset.h) : null;
+      renderCharts();
+    });
+
+    document.getElementById("tab-bar").addEventListener("click", e => {
+      const b = e.target.closest(".pill-btn");
+      if (!b) return;
+      document.querySelectorAll("#tab-bar .pill-btn").forEach(x => x.classList.remove("active"));
+      b.classList.add("active");
+      pmMode = b.dataset.mode;
+      renderCharts();
+    });
+
+    // Presets
+    document.querySelector(".preset-row").addEventListener("click", e => {
+      const b = e.target.closest("[data-preset]");
+      if (!b) return;
+      const v = parseInt(b.dataset.preset, 10);
+      document.getElementById("interval-input").value = v;
+      document.getElementById("interval-range").value = v;
+      document.getElementById("interval-display").textContent = fmtSec(v);
+      highlightPreset(v);
+    });
+
+    // Number ↔ range sync
+    const inputEl = document.getElementById("interval-input");
+    const rangeEl = document.getElementById("interval-range");
+    inputEl.addEventListener("input", () => {
+      rangeEl.value = inputEl.value;
+      document.getElementById("interval-display").textContent = fmtSec(+inputEl.value);
+      highlightPreset(+inputEl.value);
+    });
+    rangeEl.addEventListener("input", () => {
+      inputEl.value = rangeEl.value;
+      document.getElementById("interval-display").textContent = fmtSec(+rangeEl.value);
+      highlightPreset(+rangeEl.value);
+    });
+
+    // Save
+    document.getElementById("save-btn").addEventListener("click", async () => {
+      const sec = parseInt(inputEl.value, 10);
+      const fb  = document.getElementById("config-feedback");
+      if (isNaN(sec) || sec < 10 || sec > 86400) {
+        fb.style.color = "var(--red)";
+        fb.textContent = "Invalid — enter 10 to 86400 seconds.";
+        return;
+      }
+      document.getElementById("save-btn").disabled = true;
+      try {
+        const res = await fetch("/api/config", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ interval_sec: sec }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        fb.style.color = "var(--green)";
+        fb.textContent = `Saved — ESP32 picks up new interval (${fmtSec(sec)}) within 60 s.`;
+      } catch (e) {
+        fb.style.color = "var(--red)";
+        fb.textContent = "Save failed: " + e.message;
+      } finally {
+        document.getElementById("save-btn").disabled = false;
+      }
+    });
+
+    /* ── Boot ───────────────────────────────────────────────────────── */
+    fetchConfig();
+    fetchData();
+    setInterval(fetchData,   REFRESH_MS);
+    setInterval(fetchConfig, 60_000);
+
+  })();
+  </script>
+</body>
+</html>
