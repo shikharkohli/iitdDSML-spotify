@@ -1,0 +1,22 @@
+# ESP32
+esp32/pm_monitor/config.h
+esp32/.pio/
+esp32/.vscode/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.env
+
+# Database
+*.db
+*.db-wal
+*.db-shm
+
+# OS
+.DS_Store
+Thumbs.db

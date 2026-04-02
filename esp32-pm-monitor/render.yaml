@@ -1,0 +1,28 @@
+# Render.com deployment configuration
+# Deploy at: https://dashboard.render.com
+# Free tier: web service + 1 GB persistent disk
+
+services:
+  - type: web
+    name: pm-monitor
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    plan: free
+    disk:
+      name: pm-data
+      mountPath: /data
+      sizeGB: 1
+
+    envVars:
+      - key: DB_PATH
+        value: /data/pm_data.db
+      - key: API_KEY
+        generateValue: true        # Render auto-generates; copy to config.h
+      - key: DASH_USER
+        value: admin
+      - key: DASH_PASS
+        generateValue: true        # Auto-generated; note it down
+      - key: MAX_RECORDS
+        value: "10000"
