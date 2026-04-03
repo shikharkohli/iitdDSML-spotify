@@ -3,12 +3,13 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Install dependencies
-COPY requirements.txt .
+# Note: build context is esp32-pm-monitor/ when running from that directory
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application
-COPY app.py .
-COPY ../frontend ./frontend
+COPY backend/app.py .
+COPY frontend ./frontend
 
 # Create directory for SQLite database
 RUN mkdir -p /data
