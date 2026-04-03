@@ -7,7 +7,7 @@ app = "pm-monitor"
 primary_region = "sin"   # Singapore — change to nearest: bom, sin, nrt, lhr, iad
 
 [build]
-  dockerfile = "esp32-pm-monitor/backend/Dockerfile"
+  dockerfile = "backend/Dockerfile"
 
 [mounts]
   source = "pm_data"
