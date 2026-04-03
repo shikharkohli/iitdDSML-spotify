@@ -12,9 +12,17 @@
 // API key – must match API_KEY env-var on the server
 #define API_KEY       "change-me-secret-key"
 
-// ─── PMS7003 UART pins (ESP32 Hardware Serial 2) ─────────────────────────────
-#define PMS_RX_PIN    16   // ESP32 pin connected to PMS7003 TX
-#define PMS_TX_PIN    17   // ESP32 pin connected to PMS7003 RX
+// ─── Sensor model ────────────────────────────────────────────────────────────
+// Set to 5003 for PMS5003, or 7003 for PMS7003.
+// Both use the same UART frame; the only difference is that the PMS5003
+// does not populate the >10 µm particle-count field (bytes 26-27 are reserved).
+#define SENSOR_MODEL  5003
+
+// ─── PMS5003 / PMS7003 UART pins (ESP32 Hardware Serial 2) ───────────────────
+// PMS5003: connect pin 9 (TXD) → ESP32 RX, pin 7 (RXD) → ESP32 TX
+// PMS7003: connect TX → ESP32 RX, RX → ESP32 TX
+#define PMS_RX_PIN    16   // ESP32 pin connected to sensor TX
+#define PMS_TX_PIN    17   // ESP32 pin connected to sensor RX
 
 // ─── Defaults ────────────────────────────────────────────────────────────────
 // Default sampling interval in seconds (overridden by server config)

@@ -142,7 +142,8 @@ class Reading(BaseModel):
     cnt_1_0um: int = Field(..., ge=0)
     cnt_2_5um: int = Field(..., ge=0)
     cnt_5_0um: int = Field(..., ge=0)
-    cnt_10um:  int = Field(..., ge=0)
+    # PMS5003 omits this field (reserved bytes); PMS7003 provides it.
+    cnt_10um:  Optional[int] = Field(None, ge=0)
 
 
 class ConfigUpdate(BaseModel):

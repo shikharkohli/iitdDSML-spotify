@@ -1,12 +1,13 @@
 # Fly.io deployment configuration
-# Deploy with: fly launch --config fly.toml
+# Deploy with: cd esp32-pm-monitor && fly deploy
+# (Or from repo root: fly deploy -c esp32-pm-monitor/fly.toml)
 # Free tier: 3 shared-cpu-1x 256 MB VMs + 3 GB volumes
 
 app = "pm-monitor"
 primary_region = "sin"   # Singapore — change to nearest: bom, sin, nrt, lhr, iad
 
 [build]
-  dockerfile = "backend/Dockerfile"
+  dockerfile = "esp32-pm-monitor/backend/Dockerfile"
 
 [mounts]
   source = "pm_data"
