@@ -1,0 +1,51 @@
+# HTTPS reverse proxy config — generated from this template by setup.sh.
+# DOMAIN_PLACEHOLDER is replaced with your actual domain during setup.
+
+# Redirect HTTP → HTTPS; also serves ACME renewal challenges.
+server {
+    listen 80;
+    server_name DOMAIN_PLACEHOLDER;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# HTTPS — proxy to FastAPI backend
+server {
+    listen 443 ssl;
+    server_name DOMAIN_PLACEHOLDER;
+
+    ssl_certificate     /etc/letsencrypt/live/DOMAIN_PLACEHOLDER/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/DOMAIN_PLACEHOLDER/privkey.pem;
+
+    # Modern TLS: only 1.2 and 1.3, strong ciphers
+    ssl_protocols             TLSv1.2 TLSv1.3;
+    ssl_ciphers               ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache         shared:SSL:10m;
+    ssl_session_timeout       10m;
+    ssl_stapling              on;
+    ssl_stapling_verify       on;
+
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options SAMEORIGIN always;
+
+    # Increase body size limit for future-proofing; readings are tiny
+    client_max_body_size 1m;
+
+    location / {
+        proxy_pass         http://backend:8000;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto https;
+        proxy_read_timeout 60s;
+    }
+}
