@@ -40,14 +40,48 @@
  */
 
 #include <Arduino.h>
-#include "config.h"
 
-// STANDALONE_MODE defaults to 0 if not defined in config.h
-#ifndef STANDALONE_MODE
-  #define STANDALONE_MODE 0
+// config.h holds your WiFi/server credentials and personal settings.
+// For standalone serial testing it is NOT required — safe defaults below
+// will be used automatically.
+// For cloud mode: cp config.h.example config.h  then fill in your values.
+#if __has_include("config.h")
+  #include "config.h"
 #endif
 
-// WiFi / HTTP / JSON are only needed in cloud mode
+// ── Default values (overridden by config.h when it exists) ─────────────────
+// STANDALONE_MODE 1: print readings to USB serial, no WiFi required.
+// STANDALONE_MODE 0: post readings to backend over WiFi.
+#ifndef STANDALONE_MODE
+  #define STANDALONE_MODE       1
+#endif
+#ifndef SENSOR_MODEL
+  #define SENSOR_MODEL          5003
+#endif
+#ifndef PMS_RX_PIN
+  #define PMS_RX_PIN            16
+#endif
+#ifndef PMS_TX_PIN
+  #define PMS_TX_PIN            17
+#endif
+#ifndef DEFAULT_INTERVAL_SEC
+  #define DEFAULT_INTERVAL_SEC  60
+#endif
+// Cloud-only settings — only used when STANDALONE_MODE = 0
+#ifndef WIFI_SSID
+  #define WIFI_SSID             ""
+#endif
+#ifndef WIFI_PASSWORD
+  #define WIFI_PASSWORD         ""
+#endif
+#ifndef SERVER_URL
+  #define SERVER_URL            "http://localhost:8000"
+#endif
+#ifndef API_KEY
+  #define API_KEY               ""
+#endif
+
+// WiFi / HTTP / JSON are only compiled in cloud mode
 #if !STANDALONE_MODE
   #include <WiFi.h>
   #include <HTTPClient.h>
