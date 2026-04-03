@@ -252,7 +252,7 @@ def put_config(update: ConfigUpdate):
 
 @app.get("/", response_class=HTMLResponse)
 def dashboard(username: str = Depends(require_basic_auth)):
-    html_path = Path(__file__).parent.parent / "frontend" / "index.html"
+    html_path = Path(__file__).parent / "frontend" / "index.html"
     if html_path.exists():
         return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
     raise HTTPException(404, "Dashboard not found")
