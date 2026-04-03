@@ -49,29 +49,32 @@ def get_db() -> sqlite3.Connection:
 
 def init_db():
     conn = get_db()
-    conn.executescript("""
+    conn.executescript(
+        """
+        DROP TABLE readings;
         CREATE TABLE IF NOT EXISTS readings (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             ts          REAL    NOT NULL,
-            pm1_0_std   INTEGER NOT NULL,
-            pm2_5_std   INTEGER NOT NULL,
-            pm10_std    INTEGER NOT NULL,
-            pm1_0_atm   INTEGER NOT NULL,
-            pm2_5_atm   INTEGER NOT NULL,
-            pm10_atm    INTEGER NOT NULL,
-            cnt_0_3um   INTEGER NOT NULL,
-            cnt_0_5um   INTEGER NOT NULL,
-            cnt_1_0um   INTEGER NOT NULL,
-            cnt_2_5um   INTEGER NOT NULL,
-            cnt_5_0um   INTEGER NOT NULL,
-            cnt_10um    INTEGER NOT NULL
+            pm1_0_std   INTEGER ,
+            pm2_5_std   INTEGER ,
+            pm10_std    INTEGER ,
+            pm1_0_atm   INTEGER ,
+            pm2_5_atm   INTEGER ,
+            pm10_atm    INTEGER ,
+            cnt_0_3um   INTEGER ,
+            cnt_0_5um   INTEGER ,
+            cnt_1_0um   INTEGER ,
+            cnt_2_5um   INTEGER ,
+            cnt_5_0um   INTEGER ,
+            cnt_10um    INTEGER
+        
         );
         CREATE TABLE IF NOT EXISTS config (
             key   TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
-        INSERT OR IGNORE INTO config (key, value) VALUES ('interval_sec', '1800');
-    """)
+        INSERT OR IGNORE INTO config (key, value) VALUES ('interval_sec', '1800')"""
+        );
     conn.commit()
     conn.close()
 

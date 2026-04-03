@@ -1,16 +1,16 @@
 #pragma once
 
 // ─── WiFi ────────────────────────────────────────────────────────────────────
-#define WIFI_SSID     "your_wifi_ssid"
-#define WIFI_PASSWORD "your_wifi_password"
+#define WIFI_SSID     "Airtel_StarfleetHQ"
+#define WIFI_PASSWORD "ABc9868111866!"
 
 // ─── Backend ─────────────────────────────────────────────────────────────────
 // Full URL of your deployed backend, no trailing slash
 // e.g. "https://pm-monitor.onrender.com" or "http://192.168.1.100:8000"
-#define SERVER_URL    "https://your-backend.onrender.com"
+#define SERVER_URL    "https://pm-monitor.fly.dev"
 
 // API key – must match API_KEY env-var on the server
-#define API_KEY       "change-me-secret-key"
+#define API_KEY       "eee616e2b129fff0a261f32f97ca9d0e"
 
 // ─── Sensor model ────────────────────────────────────────────────────────────
 // Set to 5003 for PMS5003, or 7003 for PMS7003.
@@ -29,10 +29,10 @@
 // or posting to the backend.  Use this to verify your sensor wiring with
 // `pio device monitor` before configuring cloud upload.
 // Set to 0 (or comment out) for normal cloud-upload operation.
-#define STANDALONE_MODE  1
+#define STANDALONE_MODE  0
 
 // ─── Defaults ────────────────────────────────────────────────────────────────
 // Default sampling interval in seconds.
 // In STANDALONE_MODE this is the print interval (minimum 10 s recommended).
 // In cloud mode it is overridden by the server config.
-#define DEFAULT_INTERVAL_SEC  60   // 60 s — faster feedback when testing locally
+#define DEFAULT_INTERVAL_SEC  15   // 15 s — faster feedback when testing locally
