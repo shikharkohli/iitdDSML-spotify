@@ -24,6 +24,15 @@
 #define PMS_RX_PIN    16   // ESP32 pin connected to sensor TX
 #define PMS_TX_PIN    17   // ESP32 pin connected to sensor RX
 
+// ─── Standalone / local-only mode ────────────────────────────────────────────
+// Set to 1 to read and print PM values over Serial WITHOUT connecting to WiFi
+// or posting to the backend.  Use this to verify your sensor wiring with
+// `pio device monitor` before configuring cloud upload.
+// Set to 0 (or comment out) for normal cloud-upload operation.
+#define STANDALONE_MODE  1
+
 // ─── Defaults ────────────────────────────────────────────────────────────────
-// Default sampling interval in seconds (overridden by server config)
-#define DEFAULT_INTERVAL_SEC  1800   // 30 minutes
+// Default sampling interval in seconds.
+// In STANDALONE_MODE this is the print interval (minimum 10 s recommended).
+// In cloud mode it is overridden by the server config.
+#define DEFAULT_INTERVAL_SEC  60   // 60 s — faster feedback when testing locally
