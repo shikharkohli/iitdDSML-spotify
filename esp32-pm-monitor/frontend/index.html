@@ -619,6 +619,7 @@ main {
     let allData    = [];
     let hoursRange = 6;
     let pmMode     = "std";
+    let intervalSec = 1800;
     const REFRESH_MS = 30_000;
 
     /* ── Chart factory ──────────────────────────────────────────────── */
@@ -694,12 +695,26 @@ main {
     }
 
     /* ── Render charts ──────────────────────────────────────────────── */
+    function setChartEmpty(chart, msg) {
+      chart.data.datasets = [];
+      chart.options.plugins.title = { display: true, text: msg, color: "var(--muted)", font: { size: 13 } };
+      chart.update();
+    }
+
     function renderCharts() {
       let d = allData;
       if (hoursRange) {
         const cut = Date.now()/1000 - hoursRange*3600;
         d = d.filter(r => r.ts >= cut);
       }
+      if (!d.length) {
+        const msg = allData.length ? "No readings in this time range" : "No data yet — waiting for ESP32";
+        setChartEmpty(window._pmChart,  msg);
+        setChartEmpty(window._cntChart, msg);
+        return;
+      }
+      window._pmChart.options.plugins.title  = { display: false };
+      window._cntChart.options.plugins.title = { display: false };
       const sets = [];
       if (pmMode === "std" || pmMode === "both") {
         sets.push(ds("PM1.0 std",  d, "pm1_0_std",  "#a78bfa"));
@@ -727,7 +742,15 @@ main {
 
     /* ── Render latest stats ────────────────────────────────────────── */
     function renderStats(r) {
-      if (!r) return;
+      if (!r) {
+        document.getElementById("stats").innerHTML =
+          `<div class="stat" style="grid-column:1/-1;opacity:.6">
+             <div class="stat-label">No data yet</div>
+             <div class="stat-value cnt" style="font-size:1rem">Waiting for ESP32…</div>
+           </div>`;
+        document.getElementById("last-updated").textContent = "";
+        return;
+      }
       const items = [
         { label:"PM1.0 std",  val:r.pm1_0_std,  unit:"µg/m³", cls:"std" },
         { label:"PM2.5 std",  val:r.pm2_5_std,  unit:"µg/m³", cls:"std" },
@@ -761,15 +784,47 @@ main {
         const res = await fetch("/api/data" + qs);
         if (!res.ok) throw new Error(res.status);
         allData = await res.json();
-        const pill = document.getElementById("status-pill");
-        pill.textContent = allData.length ? "LIVE" : "NO DATA";
-        pill.className   = allData.length ? "online" : "";
-        renderStats(allData[0] || null);
+
+        const pill    = document.getElementById("status-pill");
+        const latest  = allData[0] || null;
+        const nowSec  = Date.now() / 1000;
+        const ageSec  = latest ? nowSec - latest.ts : Infinity;
+        const stale   = ageSec > intervalSec * 2.5;
+
+        if (!latest) {
+          pill.textContent = "NO DATA";
+          pill.className   = "offline";
+        } else if (stale) {
+          pill.textContent = "STALE";
+          pill.className   = "offline";
+        } else {
+          pill.textContent = "LIVE";
+          pill.className   = "online";
+        }
+
+        renderStats(latest);
+
+        // Overwrite last-updated with "last seen X ago" when stale
+        if (latest && stale) {
+          const mins = Math.round(ageSec / 60);
+          const ago  = mins < 60
+            ? `${mins} min ago`
+            : `${(mins / 60).toFixed(1)} hr ago`;
+          document.getElementById("last-updated").textContent =
+            `Sensor last seen: ${ago} — may be offline or between readings`;
+          document.getElementById("last-updated").style.color = "var(--yellow)";
+        } else {
+          document.getElementById("last-updated").style.color = "";
+        }
+
         renderCharts();
       } catch (e) {
         const pill = document.getElementById("status-pill");
         pill.textContent = "OFFLINE";
         pill.className   = "offline";
+        document.getElementById("last-updated").textContent =
+          "Cannot reach server — check your connection";
+        document.getElementById("last-updated").style.color = "var(--red)";
       } finally {
         setSpinner(false);
       }
@@ -780,6 +835,7 @@ main {
         const res = await fetch("/api/config");
         if (!res.ok) return;
         const { interval_sec } = await res.json();
+        intervalSec = interval_sec;
         document.getElementById("interval-input").value = interval_sec;
         document.getElementById("interval-range").value = interval_sec;
         document.getElementById("interval-display").textContent = fmtSec(interval_sec);
