@@ -189,6 +189,11 @@ class ConfigUpdate(BaseModel):
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
 
+@app.get("/api/health")
+def health():
+    return {"status": "ok"}
+
+
 @app.post("/api/data", status_code=201, dependencies=[Depends(require_api_key)])
 def post_data(reading: Reading):
     conn = get_db()
