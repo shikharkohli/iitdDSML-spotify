@@ -1,81 +1,86 @@
 """
 ESP32 PM Monitor — Backend
-FastAPI + SQLite
+FastAPI + Neon (PostgreSQL) via psycopg2
 
 Endpoints
 ─────────
-  POST /api/data          ESP32 posts sensor readings   (X-API-Key)
-  GET  /api/data          Historical readings            (API key or Basic Auth)
-  GET  /api/config        Current config                 (API key or Basic Auth)
-  PUT  /api/config        Update config from dashboard   (API key or Basic Auth)
-  GET  /                  Dashboard HTML                 (HTTP Basic Auth)
+  POST /api/data          ESP32 posts sensor readings   (X-API-Key required)
+  GET  /api/data          Historical readings            (public)
+  GET  /api/config        Current sampling interval      (public)
+  PUT  /api/config        Update config from dashboard   (Basic Auth required)
+
+Frontend
+────────
+  Served statically by Vercel at /  (frontend/index.html)
 
 Environment variables
 ─────────────────────
-  API_KEY      Secret key header used by ESP32     (default: changeme)
-  DASH_USER    Dashboard Basic Auth username        (default: admin)
-  DASH_PASS    Dashboard Basic Auth password        (default: changeme)
-  DB_PATH      SQLite file path                     (default: pm_data.db)
-  MAX_RECORDS  Max rows kept in DB                  (default: 10000)
+  DATABASE_URL  Neon connection string (postgresql://user:pass@host/db?sslmode=require)
+  API_KEY       Secret key header used by ESP32     (default: changeme)
+  DASH_USER     Dashboard Basic Auth username        (default: admin)
+  DASH_PASS     Dashboard Basic Auth password        (default: changeme)
+  MAX_RECORDS   Max rows kept in DB                  (default: 10000)
 """
 
 import os
 import secrets
-import sqlite3
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Optional
 
+import psycopg2
+import psycopg2.extras
+
 from fastapi import Depends, FastAPI, HTTPException, Request, status
-from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel, Field
 
 # ─── Config ───────────────────────────────────────────────────────────────────
-API_KEY     = os.getenv("API_KEY",     "changeme")
-DASH_USER   = os.getenv("DASH_USER",   "admin")
-DASH_PASS   = os.getenv("DASH_PASS",   "changeme")
-DB_PATH     = os.getenv("DB_PATH",     "pm_data.db")
-MAX_RECORDS = int(os.getenv("MAX_RECORDS", "10000"))
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+API_KEY      = os.getenv("API_KEY",     "changeme")
+DASH_USER    = os.getenv("DASH_USER",   "admin")
+DASH_PASS    = os.getenv("DASH_PASS",   "changeme")
+MAX_RECORDS  = int(os.getenv("MAX_RECORDS", "10000"))
 
 # ─── Database ─────────────────────────────────────────────────────────────────
-def get_db() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    return conn
+def get_db() -> psycopg2.extensions.connection:
+    return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
 
 
 def init_db():
     conn = get_db()
-    conn.executescript(
-        """
-        DROP TABLE readings;
+    cur = conn.cursor()
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS readings (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            ts          REAL    NOT NULL,
-            pm1_0_std   INTEGER ,
-            pm2_5_std   INTEGER ,
-            pm10_std    INTEGER ,
-            pm1_0_atm   INTEGER ,
-            pm2_5_atm   INTEGER ,
-            pm10_atm    INTEGER ,
-            cnt_0_3um   INTEGER ,
-            cnt_0_5um   INTEGER ,
-            cnt_1_0um   INTEGER ,
-            cnt_2_5um   INTEGER ,
-            cnt_5_0um   INTEGER ,
+            id          SERIAL PRIMARY KEY,
+            ts          DOUBLE PRECISION NOT NULL,
+            pm1_0_std   INTEGER,
+            pm2_5_std   INTEGER,
+            pm10_std    INTEGER,
+            pm1_0_atm   INTEGER,
+            pm2_5_atm   INTEGER,
+            pm10_atm    INTEGER,
+            cnt_0_3um   INTEGER,
+            cnt_0_5um   INTEGER,
+            cnt_1_0um   INTEGER,
+            cnt_2_5um   INTEGER,
+            cnt_5_0um   INTEGER,
             cnt_10um    INTEGER
-        
-        );
+        )
+    """)
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS config (
             key   TEXT PRIMARY KEY,
             value TEXT NOT NULL
-        );
-        INSERT OR IGNORE INTO config (key, value) VALUES ('interval_sec', '1800')"""
-        );
+        )
+    """)
+    cur.execute("""
+        INSERT INTO config (key, value) VALUES ('interval_sec', '1800')
+        ON CONFLICT (key) DO NOTHING
+    """)
     conn.commit()
+    cur.close()
     conn.close()
 
 
@@ -85,8 +90,8 @@ async def lifespan(app: FastAPI):
     init_db()
     yield
 
-app     = FastAPI(title="PM Monitor", lifespan=lifespan)
-_basic  = HTTPBasic(auto_error=False)
+app    = FastAPI(title="PM Monitor", lifespan=lifespan)
+_basic = HTTPBasic(auto_error=False)
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 def _api_key_ok(request: Request) -> bool:
@@ -145,7 +150,6 @@ class Reading(BaseModel):
     cnt_1_0um: int = Field(..., ge=0)
     cnt_2_5um: int = Field(..., ge=0)
     cnt_5_0um: int = Field(..., ge=0)
-    # PMS5003 omits this field (reserved bytes); PMS7003 provides it.
     cnt_10um:  Optional[int] = Field(None, ge=0)
 
 
@@ -159,13 +163,14 @@ class ConfigUpdate(BaseModel):
 def post_data(reading: Reading):
     conn = get_db()
     try:
-        conn.execute(
+        cur = conn.cursor()
+        cur.execute(
             """INSERT INTO readings
                (ts, pm1_0_std, pm2_5_std, pm10_std,
                 pm1_0_atm, pm2_5_atm, pm10_atm,
                 cnt_0_3um, cnt_0_5um, cnt_1_0um,
                 cnt_2_5um, cnt_5_0um, cnt_10um)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
             (
                 time.time(),
                 reading.pm1_0_std, reading.pm2_5_std, reading.pm10_std,
@@ -174,34 +179,37 @@ def post_data(reading: Reading):
                 reading.cnt_2_5um, reading.cnt_5_0um, reading.cnt_10um,
             ),
         )
-        # Prune oldest rows when over MAX_RECORDS
-        conn.execute(
-            """DELETE FROM readings WHERE id IN (
-                   SELECT id FROM readings ORDER BY ts ASC
-                   LIMIT MAX(0, (SELECT COUNT(*) FROM readings) - ?)
+        # Keep only the most recent MAX_RECORDS rows
+        cur.execute(
+            """DELETE FROM readings WHERE id NOT IN (
+                   SELECT id FROM readings ORDER BY ts DESC LIMIT %s
                )""",
             (MAX_RECORDS,),
         )
         conn.commit()
+        cur.close()
     finally:
         conn.close()
     return {"status": "ok"}
 
 
-@app.get("/api/data", dependencies=[Depends(require_any_auth)])
+@app.get("/api/data")
 def get_data(limit: int = 500, hours: Optional[float] = None):
     conn = get_db()
     try:
+        cur = conn.cursor()
         if hours is not None:
             since = time.time() - hours * 3600
-            rows = conn.execute(
-                "SELECT * FROM readings WHERE ts >= ? ORDER BY ts DESC LIMIT ?",
+            cur.execute(
+                "SELECT * FROM readings WHERE ts >= %s ORDER BY ts DESC LIMIT %s",
                 (since, limit),
-            ).fetchall()
+            )
         else:
-            rows = conn.execute(
-                "SELECT * FROM readings ORDER BY ts DESC LIMIT ?", (limit,)
-            ).fetchall()
+            cur.execute(
+                "SELECT * FROM readings ORDER BY ts DESC LIMIT %s", (limit,)
+            )
+        rows = cur.fetchall()
+        cur.close()
     finally:
         conn.close()
 
@@ -227,38 +235,33 @@ def get_data(limit: int = 500, hours: Optional[float] = None):
     ]
 
 
-@app.get("/api/config", dependencies=[Depends(require_any_auth)])
+@app.get("/api/config")
 def get_config():
     conn = get_db()
     try:
-        row = conn.execute(
-            "SELECT value FROM config WHERE key='interval_sec'"
-        ).fetchone()
+        cur = conn.cursor()
+        cur.execute("SELECT value FROM config WHERE key='interval_sec'")
+        row = cur.fetchone()
+        cur.close()
     finally:
         conn.close()
     return {"interval_sec": int(row["value"]) if row else 1800}
 
 
-@app.put("/api/config", dependencies=[Depends(require_any_auth)])
+@app.put("/api/config", dependencies=[Depends(require_basic_auth)])
 def put_config(update: ConfigUpdate):
     conn = get_db()
     try:
-        conn.execute(
-            "INSERT OR REPLACE INTO config (key, value) VALUES ('interval_sec', ?)",
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO config (key, value) VALUES ('interval_sec', %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
             (str(update.interval_sec),),
         )
         conn.commit()
+        cur.close()
     finally:
         conn.close()
     return {"interval_sec": update.interval_sec}
-
-
-@app.get("/", response_class=HTMLResponse)
-def dashboard(username: str = Depends(require_basic_auth)):
-    html_path = Path(__file__).parent / "frontend" / "index.html"
-    if html_path.exists():
-        return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
-    raise HTTPException(404, "Dashboard not found")
 
 
 if __name__ == "__main__":
