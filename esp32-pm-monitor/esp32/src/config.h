@@ -7,10 +7,10 @@
 // ─── Backend ─────────────────────────────────────────────────────────────────
 // Full URL of your deployed backend, no trailing slash
 // e.g. "https://pm-monitor.onrender.com" or "http://192.168.1.100:8000"
-#define SERVER_URL    "https://iitd-dsml-spotify-e9zvfutxd-shikharkohli-5189s-projects.vercel.app/"
+#define SERVER_URL    "https://iitd-dsml-spotify-e9zvfutxd-shikharkohli-5189s-projects.vercel.app"
 
 // API key – must match API_KEY env-var on the server
-#define API_KEY       "eee616e2b129fff0a261f32f97ca9d0e"
+#define API_KEY       "TESTKEY"
 
 // ─── Sensor model ────────────────────────────────────────────────────────────
 // Set to 5003 for PMS5003, or 7003 for PMS7003.
