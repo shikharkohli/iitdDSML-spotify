@@ -31,7 +31,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
-import pg8000.dbapi2
+import pg8000.dbapi
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -66,10 +66,10 @@ def _conn_params(url: str) -> dict:
     return params
 
 
-def get_db() -> pg8000.dbapi2.Connection:
+def get_db() -> pg8000.dbapi.Connection:
     host = urlparse(DATABASE_URL).hostname
     print(f"[DB] connecting to {host or '(no host — DATABASE_URL not set)'}")
-    conn = pg8000.dbapi2.connect(**_conn_params(DATABASE_URL))
+    conn = pg8000.dbapi.connect(**_conn_params(DATABASE_URL))
     print(f"[DB] connected to {host}")
     return conn
 
