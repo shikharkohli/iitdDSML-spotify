@@ -28,7 +28,7 @@ import ssl
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
 import pg8000.dbapi2
@@ -70,7 +70,7 @@ def get_db() -> pg8000.dbapi2.Connection:
     return pg8000.dbapi2.connect(**_conn_params(DATABASE_URL))
 
 
-def _as_dicts(cursor) -> list[dict]:
+def _as_dicts(cursor) -> List[Dict]:
     cols = [d[0] for d in cursor.description]
     return [dict(zip(cols, row)) for row in cursor.fetchall()]
 
