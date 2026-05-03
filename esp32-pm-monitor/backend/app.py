@@ -24,28 +24,55 @@ Environment variables
 
 import os
 import secrets
+import ssl
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Optional
+from urllib.parse import urlparse
 
-import psycopg2
-import psycopg2.extras
+import pg8000.dbapi2
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel, Field
 
 # ─── Config ───────────────────────────────────────────────────────────────────
-DATABASE_URL = os.getenv("DATABASE_URL", "")
+# Vercel's Neon integration sets POSTGRES_URL; fall back to DATABASE_URL
+DATABASE_URL = (
+    os.getenv("POSTGRES_URL") or
+    os.getenv("DATABASE_URL") or
+    ""
+)
 API_KEY      = os.getenv("API_KEY",     "changeme")
 DASH_USER    = os.getenv("DASH_USER",   "admin")
 DASH_PASS    = os.getenv("DASH_PASS",   "changeme")
 MAX_RECORDS  = int(os.getenv("MAX_RECORDS", "10000"))
 
 # ─── Database ─────────────────────────────────────────────────────────────────
-def get_db() -> psycopg2.extensions.connection:
-    return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+def _conn_params(url: str) -> dict:
+    r = urlparse(url)
+    params: dict = {
+        "host":     r.hostname,
+        "port":     r.port or 5432,
+        "user":     r.username,
+        "password": r.password,
+        "database": r.path.lstrip("/"),
+    }
+    # Neon (and most managed Postgres) require SSL
+    if r.hostname:
+        ctx = ssl.create_default_context()
+        params["ssl_context"] = ctx
+    return params
+
+
+def get_db() -> pg8000.dbapi2.Connection:
+    return pg8000.dbapi2.connect(**_conn_params(DATABASE_URL))
+
+
+def _as_dicts(cursor) -> list[dict]:
+    cols = [d[0] for d in cursor.description]
+    return [dict(zip(cols, row)) for row in cursor.fetchall()]
 
 
 def init_db():
@@ -87,7 +114,10 @@ def init_db():
 # ─── FastAPI ──────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
+    try:
+        init_db()
+    except Exception as e:
+        print(f"[DB] init_db failed: {e}")
     yield
 
 app    = FastAPI(title="PM Monitor", lifespan=lifespan)
@@ -208,7 +238,7 @@ def get_data(limit: int = 500, hours: Optional[float] = None):
             cur.execute(
                 "SELECT * FROM readings ORDER BY ts DESC LIMIT %s", (limit,)
             )
-        rows = cur.fetchall()
+        rows = _as_dicts(cur)
         cur.close()
     finally:
         conn.close()
@@ -245,7 +275,7 @@ def get_config():
         cur.close()
     finally:
         conn.close()
-    return {"interval_sec": int(row["value"]) if row else 1800}
+    return {"interval_sec": int(row[0]) if row else 1800}
 
 
 @app.put("/api/config", dependencies=[Depends(require_basic_auth)])
