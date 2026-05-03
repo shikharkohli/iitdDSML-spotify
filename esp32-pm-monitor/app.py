@@ -67,7 +67,11 @@ def _conn_params(url: str) -> dict:
 
 
 def get_db() -> pg8000.dbapi2.Connection:
-    return pg8000.dbapi2.connect(**_conn_params(DATABASE_URL))
+    host = urlparse(DATABASE_URL).hostname
+    print(f"[DB] connecting to {host or '(no host — DATABASE_URL not set)'}")
+    conn = pg8000.dbapi2.connect(**_conn_params(DATABASE_URL))
+    print(f"[DB] connected to {host}")
+    return conn
 
 
 def _as_dicts(cursor) -> List[Dict]:
@@ -76,6 +80,7 @@ def _as_dicts(cursor) -> List[Dict]:
 
 
 def init_db():
+    print("[DB] init_db: starting")
     conn = get_db()
     cur = conn.cursor()
     cur.execute("""
@@ -116,8 +121,11 @@ def init_db():
 async def lifespan(app: FastAPI):
     try:
         init_db()
+        print("[DB] init_db: done")
     except Exception as e:
+        import traceback
         print(f"[DB] init_db failed: {e}")
+        traceback.print_exc()
     yield
 
 app    = FastAPI(title="PM Monitor", lifespan=lifespan)
