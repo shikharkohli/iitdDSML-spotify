@@ -119,13 +119,6 @@ def init_db():
 # ─── FastAPI ──────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    try:
-        init_db()
-        print("[DB] init_db: done")
-    except Exception as e:
-        import traceback
-        print(f"[DB] init_db failed: {e}")
-        traceback.print_exc()
     yield
 
 app    = FastAPI(title="PM Monitor", lifespan=lifespan)
