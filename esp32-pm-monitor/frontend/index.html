@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)" />
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
-<title>PM Monitor</title>
+<title>Kohli Home AQI</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <style>
@@ -112,6 +112,22 @@
     font-size: 17px;
     font-weight: 600;
     letter-spacing: -0.022em;
+  }
+  .header-left {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  .header-sub {
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .header-right {
     display: flex;
@@ -451,7 +467,10 @@
 </head>
 <body>
 <header>
-  <h1>PM Monitor</h1>
+  <div class="header-left">
+    <h1>Kohli Home AQI</h1>
+    <span class="header-sub" id="headerSub">—</span>
+  </div>
   <div class="header-right">
     <div class="status">
       <span class="dot" id="statusDot"></span>
@@ -656,6 +675,14 @@ function setStatus(state, text) {
   $('statusText').textContent = text;
 }
 
+function formatRelative(ageSec) {
+  if (ageSec < 5)    return 'just now';
+  if (ageSec < 60)   return `${Math.round(ageSec)} s ago`;
+  if (ageSec < 3600) return `${Math.round(ageSec / 60)} min ago`;
+  if (ageSec < 86400) return `${Math.round(ageSec / 3600)} h ago`;
+  return `${Math.round(ageSec / 86400)} d ago`;
+}
+
 function cardHtml(label, value, unit, cat) {
   const stripe = cat ? `<div class="stripe ${cat.key}"></div>` : '';
   const badge = cat ? `<div><span class="badge ${cat.key}">${cat.label}</span></div>` : '';
@@ -827,9 +854,13 @@ async function fetchAll() {
       const expected = (cfg.interval_sec || 1800) * 2;
       const live = ageSec < expected;
       setStatus(live ? 'live' : 'stale', live ? 'Live' : 'Stale');
-      $('lastSeen').textContent = 'Last reading ' + new Date(latest.ts * 1000).toLocaleString();
+      const when = new Date(latest.ts * 1000).toLocaleString();
+      $('lastSeen').textContent = 'Last reading ' + when;
+      $('headerSub').textContent =
+        `PM2.5 ${latest.pm2_5_atm} µg/m³ · ${formatRelative(ageSec)}`;
     } else {
       setStatus('stale', 'Waiting for data');
+      $('headerSub').textContent = 'No readings yet';
     }
   } catch (e) {
     setStatus('error', 'Connection error');
