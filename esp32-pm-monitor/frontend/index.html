@@ -3,176 +3,344 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<meta name="theme-color" content="#0f1117" />
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
 <title>PM Monitor</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <style>
-  :root {
-    --bg: #0f1117;
-    --surface: #1a1d27;
-    --surface-2: #232735;
-    --border: #2d3148;
-    --text: #e2e8f0;
-    --muted: #94a3b8;
-    --accent: #4f8ef7;
-    --good: #34d399;
-    --mod: #fbbf24;
-    --usg: #fb923c;
-    --bad: #f87171;
-    --vbad: #c084fc;
-    --hazard: #ef4444;
+  /* ── Apple-style design tokens ───────────────────────────────────────────── */
+  :root, [data-theme="light"] {
+    --bg:           #f2f2f7;   /* systemGroupedBackground */
+    --surface:      #ffffff;   /* secondarySystemGroupedBackground */
+    --surface-2:    #e5e5ea;   /* fill */
+    --border:       rgba(60,60,67,0.12);
+    --separator:    rgba(60,60,67,0.18);
+    --text:         #000000;   /* label */
+    --text-2:       rgba(60,60,67,0.85);
+    --muted:        rgba(60,60,67,0.60);  /* secondaryLabel */
+    --muted-2:      rgba(60,60,67,0.30);  /* tertiaryLabel */
+    --accent:       #007aff;   /* systemBlue */
+    --header-bg:    rgba(242,242,247,0.78);
+    --modal-bg:     rgba(0,0,0,0.32);
+    --shadow:       0 1px 3px rgba(0,0,0,0.05), 0 8px 24px rgba(0,0,0,0.04);
+    --good:         #34c759;   /* systemGreen */
+    --mod:          #ffcc00;   /* systemYellow */
+    --usg:          #ff9500;   /* systemOrange */
+    --bad:          #ff3b30;   /* systemRed */
+    --vbad:         #af52de;   /* systemPurple */
+    --hazard:       #8e0b0b;
   }
+  [data-theme="dark"] {
+    --bg:           #000000;   /* systemBackground (dark) */
+    --surface:      #1c1c1e;   /* secondarySystemBackground */
+    --surface-2:    #2c2c2e;   /* tertiarySystemBackground */
+    --border:       rgba(84,84,88,0.40);
+    --separator:    rgba(84,84,88,0.65);
+    --text:         #ffffff;
+    --text-2:       rgba(235,235,245,0.92);
+    --muted:        rgba(235,235,245,0.60);
+    --muted-2:      rgba(235,235,245,0.30);
+    --accent:       #0a84ff;   /* systemBlue (dark) */
+    --header-bg:    rgba(0,0,0,0.72);
+    --modal-bg:     rgba(0,0,0,0.55);
+    --shadow:       0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.30);
+    --good:         #30d158;
+    --mod:          #ffd60a;
+    --usg:          #ff9f0a;
+    --bad:          #ff453a;
+    --vbad:         #bf5af2;
+    --hazard:       #ff6b6b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:           #000000;
+      --surface:      #1c1c1e;
+      --surface-2:    #2c2c2e;
+      --border:       rgba(84,84,88,0.40);
+      --separator:    rgba(84,84,88,0.65);
+      --text:         #ffffff;
+      --text-2:       rgba(235,235,245,0.92);
+      --muted:        rgba(235,235,245,0.60);
+      --muted-2:      rgba(235,235,245,0.30);
+      --accent:       #0a84ff;
+      --header-bg:    rgba(0,0,0,0.72);
+      --modal-bg:     rgba(0,0,0,0.55);
+      --shadow:       0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.30);
+      --good:         #30d158;
+      --mod:          #ffd60a;
+      --usg:          #ff9f0a;
+      --bad:          #ff453a;
+      --vbad:         #bf5af2;
+      --hazard:       #ff6b6b;
+    }
+  }
+
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
     background: var(--bg);
     color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-    font-size: 16px;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", "Helvetica Neue", system-ui, sans-serif;
+    font-size: 17px;          /* Apple body */
+    line-height: 1.4;
+    letter-spacing: -0.01em;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     min-height: 100vh;
+    transition: background 0.25s ease, color 0.25s ease;
   }
+
+  /* Sticky translucent header (Apple navigation bar feel) */
   header {
-    padding: 14px 20px;
-    border-bottom: 1px solid var(--border);
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--separator);
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
     gap: 12px;
-    background: var(--surface);
+    background: var(--header-bg);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
     position: sticky;
     top: 0;
     z-index: 10;
   }
-  h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  h1 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.022em;
+  }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
   .status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
   .dot {
     width: 8px; height: 8px; border-radius: 50%;
-    background: var(--muted);
+    background: var(--muted-2);
     transition: background 0.3s;
   }
   .dot.live { background: var(--good); box-shadow: 0 0 8px var(--good); }
   .dot.stale { background: var(--mod); }
   .dot.error { background: var(--bad); }
+
+  .theme-btn {
+    width: 36px; height: 36px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: var(--surface-2);
+    border: none;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+  .theme-btn:hover { background: var(--border); }
+  .theme-btn:active { transform: scale(0.94); }
+
   main {
-    padding: 16px;
-    max-width: 1200px;
+    padding: 20px;
+    max-width: 1100px;
     margin: 0 auto;
   }
+  .section-label {
+    margin: 18px 4px 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .section-label:first-of-type { margin-top: 4px; }
+
+  /* Toolbar */
   .toolbar {
     display: flex;
-    gap: 16px;
-    margin-bottom: 16px;
+    gap: 18px;
+    margin-bottom: 20px;
     flex-wrap: wrap;
     align-items: center;
   }
   .toolbar-group {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     flex-wrap: wrap;
   }
   .toolbar-label {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-weight: 500;
   }
-  .btn-row {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
+
+  /* Apple-style segmented control */
+  .segmented {
+    display: inline-flex;
+    background: var(--surface-2);
+    border-radius: 9px;
+    padding: 2px;
+    gap: 0;
   }
-  button, select {
+  .segmented button {
+    background: transparent;
+    border: none;
+    color: var(--text);
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease;
+    min-height: 30px;
+    font-family: inherit;
+  }
+  .segmented button.active {
+    background: var(--surface);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 0 0 0.5px var(--border);
+  }
+  [data-theme="dark"] .segmented button.active {
+    background: rgba(118,118,128,0.36);
+    box-shadow: none;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .segmented button.active {
+      background: rgba(118,118,128,0.36);
+      box-shadow: none;
+    }
+  }
+
+  /* Generic button */
+  button {
     background: var(--surface);
     color: var(--text);
     border: 1px solid var(--border);
-    padding: 8px 14px;
-    border-radius: 8px;
-    font-size: 14px;
+    padding: 9px 16px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 500;
     cursor: pointer;
     font-family: inherit;
-    transition: all 0.15s;
-    min-height: 38px;
+    transition: all 0.15s ease;
+    min-height: 36px;
+    letter-spacing: -0.01em;
   }
-  button:hover:not(:disabled), select:hover { background: var(--surface-2); }
-  button.active {
+  button:hover:not(:disabled) { background: var(--surface-2); }
+  button:active:not(:disabled) { transform: scale(0.98); }
+  button.primary {
     background: var(--accent);
     border-color: var(--accent);
-    color: white;
+    color: #fff;
   }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.primary:hover:not(:disabled) { filter: brightness(0.95); background: var(--accent); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Native-feel select */
+  select {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 8px 32px 8px 14px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-family: inherit;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='gray' d='M0 0l5 6 5-6z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    min-height: 36px;
+    transition: background-color 0.15s ease;
+  }
+  select:hover { background-color: var(--surface-2); }
+
+  /* Cards grid */
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 12px;
-    margin-bottom: 20px;
+    margin-bottom: 8px;
   }
   .card {
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 14px;
+    border-radius: 14px;
+    padding: 16px;
     position: relative;
     overflow: hidden;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
   }
   .card .label {
-    font-size: 11px;
+    font-size: 13px;
     color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
     margin-bottom: 6px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
   }
   .card .value {
-    font-size: 28px;
+    font-size: 30px;
     font-weight: 600;
-    line-height: 1;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
   }
   .card .unit {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--muted);
     margin-left: 4px;
+    font-weight: 400;
   }
   .card .badge {
     display: inline-block;
-    margin-top: 8px;
-    padding: 2px 8px;
+    margin-top: 10px;
+    padding: 3px 10px;
     border-radius: 999px;
-    font-size: 11px;
-    font-weight: 500;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
   }
   .card .stripe {
     position: absolute;
     left: 0; top: 0; bottom: 0;
     width: 4px;
+    border-radius: 4px 0 0 4px;
   }
-  .badge.good, .stripe.good { background: rgba(52,211,153,.18); color: var(--good); }
-  .badge.mod, .stripe.mod   { background: rgba(251,191,36,.18); color: var(--mod); }
-  .badge.usg, .stripe.usg   { background: rgba(251,146,60,.18); color: var(--usg); }
-  .badge.bad, .stripe.bad   { background: rgba(248,113,113,.18); color: var(--bad); }
-  .badge.vbad, .stripe.vbad { background: rgba(192,132,252,.18); color: var(--vbad); }
-  .badge.hazard, .stripe.hazard { background: rgba(239,68,68,.22); color: var(--hazard); }
-  .stripe.good { background: var(--good); }
-  .stripe.mod  { background: var(--mod); }
-  .stripe.usg  { background: var(--usg); }
-  .stripe.bad  { background: var(--bad); }
-  .stripe.vbad { background: var(--vbad); }
+
+  .badge.good   { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+  .badge.mod    { background: color-mix(in srgb, var(--mod) 22%, transparent); color: var(--usg); }
+  .badge.usg    { background: color-mix(in srgb, var(--usg) 18%, transparent); color: var(--usg); }
+  .badge.bad    { background: color-mix(in srgb, var(--bad) 18%, transparent); color: var(--bad); }
+  .badge.vbad   { background: color-mix(in srgb, var(--vbad) 18%, transparent); color: var(--vbad); }
+  .badge.hazard { background: color-mix(in srgb, var(--hazard) 22%, transparent); color: var(--hazard); }
+  .stripe.good   { background: var(--good); }
+  .stripe.mod    { background: var(--mod); }
+  .stripe.usg    { background: var(--usg); }
+  .stripe.bad    { background: var(--bad); }
+  .stripe.vbad   { background: var(--vbad); }
   .stripe.hazard { background: var(--hazard); }
 
+  /* Charts */
   .chart-wrap {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 16px;
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow);
   }
   .chart-wrap h2 {
-    margin: 0 0 12px;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--muted);
+    margin: 0 0 14px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.015em;
   }
   .chart-canvas {
     position: relative;
@@ -184,9 +352,9 @@
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 8px;
-    font-size: 12px;
+    font-size: 13px;
     color: var(--muted);
-    margin-top: 8px;
+    margin-top: 12px;
     padding: 0 4px;
   }
   .empty {
@@ -195,12 +363,14 @@
     color: var(--muted);
   }
 
-  /* Modal */
+  /* Modal — Apple sheet feel */
   .modal-bg {
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,.6);
+    background: var(--modal-bg);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
     z-index: 100;
     align-items: center;
     justify-content: center;
@@ -209,61 +379,87 @@
   .modal-bg.show { display: flex; }
   .modal {
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 20px;
+    border-radius: 16px;
+    padding: 22px;
     max-width: 380px;
     width: 100%;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.30);
+    border: 1px solid var(--border);
   }
-  .modal h3 { margin: 0 0 8px; font-size: 16px; }
-  .modal p { margin: 0 0 16px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+  .modal h3 {
+    margin: 0 0 8px;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.022em;
+  }
+  .modal p {
+    margin: 0 0 18px;
+    color: var(--text-2);
+    font-size: 15px;
+    line-height: 1.45;
+  }
   .modal-actions {
     display: flex;
-    gap: 8px;
+    gap: 10px;
     justify-content: flex-end;
   }
   .modal input {
     width: 100%;
-    padding: 8px 12px;
+    padding: 10px 14px;
     background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 10px;
     color: var(--text);
     font-family: inherit;
-    font-size: 14px;
+    font-size: 15px;
     margin-bottom: 12px;
+    transition: border-color 0.15s ease;
   }
+  .modal input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  /* Toast */
   .toast {
     position: fixed;
-    bottom: 20px;
+    bottom: 24px;
     left: 50%;
     transform: translateX(-50%);
-    background: var(--surface-2);
+    background: var(--surface);
+    color: var(--text);
     border: 1px solid var(--border);
-    padding: 10px 16px;
-    border-radius: 8px;
-    font-size: 13px;
-    box-shadow: 0 4px 16px rgba(0,0,0,.4);
+    padding: 11px 18px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.18);
     z-index: 200;
-    transition: opacity 0.3s;
+    transition: opacity 0.3s ease, transform 0.3s ease;
   }
-  .toast.hidden { opacity: 0; pointer-events: none; }
+  .toast.hidden { opacity: 0; transform: translate(-50%, 8px); pointer-events: none; }
 
   @media (max-width: 480px) {
-    h1 { font-size: 16px; }
-    .card .value { font-size: 22px; }
+    body { font-size: 16px; }
+    .card .value { font-size: 24px; }
     .chart-canvas { height: 220px; }
-    main { padding: 12px; }
-    .toolbar { gap: 12px; }
+    main { padding: 14px; }
+    .toolbar { gap: 14px; }
+    .segmented button { padding: 6px 11px; font-size: 13px; }
   }
 </style>
 </head>
 <body>
 <header>
   <h1>PM Monitor</h1>
-  <div class="status">
-    <span class="dot" id="statusDot"></span>
-    <span id="statusText">Loading…</span>
+  <div class="header-right">
+    <div class="status">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText">Loading…</span>
+    </div>
+    <button class="theme-btn" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">
+      <span id="themeIcon">◐</span>
+    </button>
   </div>
 </header>
 
@@ -271,7 +467,7 @@
   <div class="toolbar">
     <div class="toolbar-group">
       <span class="toolbar-label">Range</span>
-      <div class="btn-row" id="rangeBtns">
+      <div class="segmented" id="rangeBtns" role="group" aria-label="Time range">
         <button data-hours="1">1h</button>
         <button data-hours="6">6h</button>
         <button data-hours="24" class="active">24h</button>
@@ -290,13 +486,13 @@
     </div>
   </div>
 
-  <h2 style="margin:8px 0; font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px;">Air Quality Index</h2>
+  <h2 class="section-label">Air Quality Index</h2>
   <div class="grid" id="aqiCards">
     <div class="card"><div class="label">AQI (US EPA)</div><div class="value">—</div></div>
     <div class="card"><div class="label">AQI (India CPCB)</div><div class="value">—</div></div>
   </div>
 
-  <h2 style="margin:8px 0; font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px;">Particulate matter</h2>
+  <h2 class="section-label">Particulate matter</h2>
   <div class="grid" id="pmCards">
     <div class="card"><div class="label">PM1.0</div><div class="value">—</div></div>
     <div class="card"><div class="label">PM2.5</div><div class="value">—</div></div>
@@ -326,7 +522,7 @@
     <p id="confirmText">Change ESP32 sampling to <strong>30 s</strong>. Device will pick up the new value at its next config poll.</p>
     <div class="modal-actions">
       <button id="confirmCancel">Cancel</button>
-      <button id="confirmOk" class="active">Update</button>
+      <button id="confirmOk" class="primary">Update</button>
     </div>
   </div>
 </div>
@@ -340,7 +536,7 @@
     <input id="authPass" type="password" placeholder="Password" autocomplete="current-password" />
     <div class="modal-actions">
       <button id="authCancel">Cancel</button>
-      <button id="authOk" class="active">Save</button>
+      <button id="authOk" class="primary">Save</button>
     </div>
   </div>
 </div>
@@ -356,6 +552,27 @@ let serverInterval = null; // last known from server
 let pendingInterval = null;
 
 const $ = (id) => document.getElementById(id);
+
+/* ── Theme (Apple light/dark) ─────────────────────────────────────────────── */
+const THEME_KEY = 'pm-theme';
+function effectiveTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved === 'light' || saved === 'dark') return saved;
+  return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  $('themeIcon').textContent = theme === 'dark' ? '☾' : '☀';
+  if (pmChart) restyleCharts();
+}
+function toggleTheme() {
+  const next = effectiveTheme() === 'dark' ? 'light' : 'dark';
+  localStorage.setItem(THEME_KEY, next);
+  applyTheme(next);
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  if (!localStorage.getItem(THEME_KEY)) applyTheme(effectiveTheme());
+});
 
 /* ── PM individual category (US EPA breakpoints, instantaneous) ── */
 function pmCategory(species, v) {
@@ -491,30 +708,57 @@ function buildLine(label, color) {
   };
 }
 
+function themePalette() {
+  const dark = effectiveTheme() === 'dark';
+  return {
+    tick:    dark ? 'rgba(235,235,245,0.55)' : 'rgba(60,60,67,0.60)',
+    grid:    dark ? 'rgba(84,84,88,0.30)' : 'rgba(60,60,67,0.10)',
+    tipBg:   dark ? '#1c1c1e' : '#ffffff',
+    tipText: dark ? '#ffffff' : '#000000',
+    tipBorder: dark ? 'rgba(84,84,88,0.55)' : 'rgba(60,60,67,0.18)',
+  };
+}
 function chartOpts(yLabel) {
+  const p = themePalette();
   return {
     responsive: true,
     maintainAspectRatio: false,
     interaction: { mode: 'index', intersect: false },
     plugins: {
-      legend: { labels: { color: '#94a3b8', boxWidth: 12, font: { size: 11 } } },
-      tooltip: { backgroundColor: '#1a1d27', titleColor: '#e2e8f0', bodyColor: '#e2e8f0' },
+      legend: { labels: { color: p.tick, boxWidth: 12, font: { size: 12 } } },
+      tooltip: {
+        backgroundColor: p.tipBg,
+        titleColor: p.tipText,
+        bodyColor: p.tipText,
+        borderColor: p.tipBorder,
+        borderWidth: 1,
+        padding: 10,
+        cornerRadius: 8,
+      },
     },
     scales: {
       x: {
         type: 'time',
         time: { tooltipFormat: 'PPpp' },
-        ticks: { color: '#94a3b8', maxRotation: 0, autoSkipPadding: 20 },
-        grid: { color: 'rgba(45,49,72,.4)' },
+        ticks: { color: p.tick, maxRotation: 0, autoSkipPadding: 20 },
+        grid: { color: p.grid },
       },
       y: {
-        title: { display: true, text: yLabel, color: '#94a3b8' },
-        ticks: { color: '#94a3b8' },
-        grid: { color: 'rgba(45,49,72,.4)' },
+        title: { display: true, text: yLabel, color: p.tick },
+        ticks: { color: p.tick },
+        grid: { color: p.grid },
         beginAtZero: true,
       },
     },
   };
+}
+function restyleCharts() {
+  for (const ch of [pmChart, cntChart]) {
+    if (!ch) continue;
+    const yLabel = ch.options.scales.y.title.text;
+    ch.options = chartOpts(yLabel);
+    ch.update('none');
+  }
 }
 
 function initCharts() {
@@ -709,7 +953,10 @@ $('confirmOk').addEventListener('click', async () => {
   }
 });
 
+$('themeBtn').addEventListener('click', toggleTheme);
+applyTheme(effectiveTheme());
 initCharts();
+restyleCharts();
 fetchAll();
 setInterval(fetchAll, REFRESH_MS);
 </script>
