@@ -1,5 +1,7 @@
 {
-  "rewrites": [
-    { "source": "/", "destination": "/frontend/index.html" }
-  ]
+  "functions": {
+    "app.py": {
+      "includeFiles": "frontend/**"
+    }
+  }
 }

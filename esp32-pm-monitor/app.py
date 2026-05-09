@@ -28,14 +28,18 @@ import ssl
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
 import pg8000.dbapi
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi.responses import FileResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel, Field
+
+FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 # Vercel's Neon integration sets POSTGRES_URL; fall back to DATABASE_URL
@@ -193,6 +197,11 @@ class ConfigUpdate(BaseModel):
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/")
+def root():
+    return FileResponse(FRONTEND_DIR / "index.html")
 
 
 @app.post("/api/data", status_code=201, dependencies=[Depends(require_api_key)])
