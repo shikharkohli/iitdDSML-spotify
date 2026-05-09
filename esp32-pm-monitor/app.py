@@ -112,7 +112,7 @@ def init_db():
         )
     """)
     cur.execute("""
-        INSERT INTO config (key, value) VALUES ('interval_sec', '1800')
+        INSERT INTO config (key, value) VALUES ('interval_sec', '30')
         ON CONFLICT (key) DO NOTHING
     """)
     conn.commit()
@@ -123,6 +123,19 @@ def init_db():
 # ─── FastAPI ──────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO config (key, value) VALUES ('interval_sec', '30') "
+            "ON CONFLICT (key) DO UPDATE SET value = '30' "
+            "WHERE config.value = '1800'"
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f"[DB] interval default migration skipped: {e}")
     yield
 
 app    = FastAPI(title="PM Monitor", lifespan=lifespan)
