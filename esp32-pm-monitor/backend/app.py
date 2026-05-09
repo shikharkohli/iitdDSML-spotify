@@ -273,7 +273,15 @@ def get_data(limit: int = 500, hours: Optional[float] = None):
 
 @app.get("/api/config")
 def get_config():
-    return {"interval_sec": 30}
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT value FROM config WHERE key='interval_sec'")
+        row = cur.fetchone()
+        cur.close()
+    finally:
+        conn.close()
+    return {"interval_sec": int(row[0]) if row else 30}
 
 
 @app.put("/api/config", dependencies=[Depends(require_basic_auth)])

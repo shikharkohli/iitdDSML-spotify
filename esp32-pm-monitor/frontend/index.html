@@ -17,9 +17,11 @@
     --muted: #94a3b8;
     --accent: #4f8ef7;
     --good: #34d399;
-    --warn: #fbbf24;
+    --mod: #fbbf24;
+    --usg: #fb923c;
     --bad: #f87171;
-    --hazard: #a78bfa;
+    --vbad: #c084fc;
+    --hazard: #ef4444;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
@@ -32,7 +34,7 @@
     min-height: 100vh;
   }
   header {
-    padding: 16px 20px;
+    padding: 14px 20px;
     border-bottom: 1px solid var(--border);
     display: flex;
     justify-content: space-between;
@@ -52,20 +54,38 @@
     transition: background 0.3s;
   }
   .dot.live { background: var(--good); box-shadow: 0 0 8px var(--good); }
-  .dot.stale { background: var(--warn); }
+  .dot.stale { background: var(--mod); }
   .dot.error { background: var(--bad); }
   main {
     padding: 16px;
     max-width: 1200px;
     margin: 0 auto;
   }
-  .controls {
+  .toolbar {
     display: flex;
-    gap: 8px;
+    gap: 16px;
     margin-bottom: 16px;
     flex-wrap: wrap;
+    align-items: center;
   }
-  button {
+  .toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .toolbar-label {
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .btn-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  button, select {
     background: var(--surface);
     color: var(--text);
     border: 1px solid var(--border);
@@ -77,15 +97,16 @@
     transition: all 0.15s;
     min-height: 38px;
   }
-  button:hover { background: var(--surface-2); }
+  button:hover:not(:disabled), select:hover { background: var(--surface-2); }
   button.active {
     background: var(--accent);
     border-color: var(--accent);
     color: white;
   }
-  .cards {
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 12px;
     margin-bottom: 20px;
   }
@@ -94,6 +115,8 @@
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 14px;
+    position: relative;
+    overflow: hidden;
   }
   .card .label {
     font-size: 11px;
@@ -120,10 +143,24 @@
     font-size: 11px;
     font-weight: 500;
   }
-  .badge.good { background: rgba(52,211,153,.15); color: var(--good); }
-  .badge.warn { background: rgba(251,191,36,.15); color: var(--warn); }
-  .badge.bad { background: rgba(248,113,113,.15); color: var(--bad); }
-  .badge.hazard { background: rgba(167,139,250,.15); color: var(--hazard); }
+  .card .stripe {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+  }
+  .badge.good, .stripe.good { background: rgba(52,211,153,.18); color: var(--good); }
+  .badge.mod, .stripe.mod   { background: rgba(251,191,36,.18); color: var(--mod); }
+  .badge.usg, .stripe.usg   { background: rgba(251,146,60,.18); color: var(--usg); }
+  .badge.bad, .stripe.bad   { background: rgba(248,113,113,.18); color: var(--bad); }
+  .badge.vbad, .stripe.vbad { background: rgba(192,132,252,.18); color: var(--vbad); }
+  .badge.hazard, .stripe.hazard { background: rgba(239,68,68,.22); color: var(--hazard); }
+  .stripe.good { background: var(--good); }
+  .stripe.mod  { background: var(--mod); }
+  .stripe.usg  { background: var(--usg); }
+  .stripe.bad  { background: var(--bad); }
+  .stripe.vbad { background: var(--vbad); }
+  .stripe.hazard { background: var(--hazard); }
+
   .chart-wrap {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -150,17 +187,74 @@
     font-size: 12px;
     color: var(--muted);
     margin-top: 8px;
+    padding: 0 4px;
   }
   .empty {
     text-align: center;
     padding: 40px 20px;
     color: var(--muted);
   }
+
+  /* Modal */
+  .modal-bg {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.6);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-bg.show { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    max-width: 380px;
+    width: 100%;
+  }
+  .modal h3 { margin: 0 0 8px; font-size: 16px; }
+  .modal p { margin: 0 0 16px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+  .modal input {
+    width: 100%;
+    padding: 8px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    margin-bottom: 12px;
+  }
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.4);
+    z-index: 200;
+    transition: opacity 0.3s;
+  }
+  .toast.hidden { opacity: 0; pointer-events: none; }
+
   @media (max-width: 480px) {
     h1 { font-size: 16px; }
     .card .value { font-size: 22px; }
     .chart-canvas { height: 220px; }
     main { padding: 12px; }
+    .toolbar { gap: 12px; }
   }
 </style>
 </head>
@@ -174,19 +268,39 @@
 </header>
 
 <main>
-  <div class="controls" role="group" aria-label="Time range">
-    <button data-hours="1">1h</button>
-    <button data-hours="6">6h</button>
-    <button data-hours="24" class="active">24h</button>
-    <button data-hours="168">7d</button>
-    <button data-hours="">All</button>
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <span class="toolbar-label">Range</span>
+      <div class="btn-row" id="rangeBtns">
+        <button data-hours="1">1h</button>
+        <button data-hours="6">6h</button>
+        <button data-hours="24" class="active">24h</button>
+        <button data-hours="168">7d</button>
+        <button data-hours="">All</button>
+      </div>
+    </div>
+    <div class="toolbar-group">
+      <span class="toolbar-label">Sample interval</span>
+      <select id="intervalSelect">
+        <option value="30">30 s</option>
+        <option value="60">1 min</option>
+        <option value="900">15 min</option>
+        <option value="1800">30 min</option>
+      </select>
+    </div>
   </div>
 
-  <div class="cards" id="cards">
+  <h2 style="margin:8px 0; font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px;">Air Quality Index</h2>
+  <div class="grid" id="aqiCards">
+    <div class="card"><div class="label">AQI (US EPA)</div><div class="value">—</div></div>
+    <div class="card"><div class="label">AQI (India CPCB)</div><div class="value">—</div></div>
+  </div>
+
+  <h2 style="margin:8px 0; font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px;">Particulate matter</h2>
+  <div class="grid" id="pmCards">
     <div class="card"><div class="label">PM1.0</div><div class="value">—</div></div>
     <div class="card"><div class="label">PM2.5</div><div class="value">—</div></div>
     <div class="card"><div class="label">PM10</div><div class="value">—</div></div>
-    <div class="card"><div class="label">Interval</div><div class="value">—</div></div>
   </div>
 
   <div class="chart-wrap">
@@ -205,52 +319,165 @@
   </div>
 </main>
 
+<!-- Confirm interval modal -->
+<div class="modal-bg" id="confirmModal">
+  <div class="modal">
+    <h3>Update sample interval?</h3>
+    <p id="confirmText">Change ESP32 sampling to <strong>30 s</strong>. Device will pick up the new value at its next config poll.</p>
+    <div class="modal-actions">
+      <button id="confirmCancel">Cancel</button>
+      <button id="confirmOk" class="active">Update</button>
+    </div>
+  </div>
+</div>
+
+<!-- Auth modal -->
+<div class="modal-bg" id="authModal">
+  <div class="modal">
+    <h3>Dashboard credentials</h3>
+    <p>Required to update interval. Stored only for this session.</p>
+    <input id="authUser" placeholder="Username" autocomplete="username" />
+    <input id="authPass" type="password" placeholder="Password" autocomplete="current-password" />
+    <div class="modal-actions">
+      <button id="authCancel">Cancel</button>
+      <button id="authOk" class="active">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
 <script>
 const REFRESH_MS = 15000;
+const VALID_INTERVALS = [30, 60, 900, 1800];
 let currentHours = 24;
 let pmChart, cntChart;
+let serverInterval = null; // last known from server
+let pendingInterval = null;
 
 const $ = (id) => document.getElementById(id);
 
-function pm25Badge(v) {
-  if (v == null) return '';
-  if (v <= 12)  return '<span class="badge good">Good</span>';
-  if (v <= 35)  return '<span class="badge warn">Moderate</span>';
-  if (v <= 55)  return '<span class="badge bad">Unhealthy (sensitive)</span>';
-  if (v <= 150) return '<span class="badge bad">Unhealthy</span>';
-  return '<span class="badge hazard">Hazardous</span>';
+/* ── PM individual category (US EPA breakpoints, instantaneous) ── */
+function pmCategory(species, v) {
+  if (v == null) return null;
+  // returns { key, label }
+  if (species === 'pm25' || species === 'pm1') {
+    if (v <= 12)  return { key: 'good', label: 'Good' };
+    if (v <= 35)  return { key: 'mod',  label: 'Moderate' };
+    if (v <= 55)  return { key: 'usg',  label: 'Unhealthy (sensitive)' };
+    if (v <= 150) return { key: 'bad',  label: 'Unhealthy' };
+    if (v <= 250) return { key: 'vbad', label: 'Very unhealthy' };
+    return { key: 'hazard', label: 'Hazardous' };
+  }
+  // pm10
+  if (v <= 54)  return { key: 'good', label: 'Good' };
+  if (v <= 154) return { key: 'mod',  label: 'Moderate' };
+  if (v <= 254) return { key: 'usg',  label: 'Unhealthy (sensitive)' };
+  if (v <= 354) return { key: 'bad',  label: 'Unhealthy' };
+  if (v <= 424) return { key: 'vbad', label: 'Very unhealthy' };
+  return { key: 'hazard', label: 'Hazardous' };
+}
+
+/* ── AQI breakpoints ── */
+const US_PM25 = [
+  [0.0, 12.0,   0,  50, 'Good',          'good'],
+  [12.1, 35.4,  51, 100, 'Moderate',     'mod'],
+  [35.5, 55.4, 101, 150, 'USG',          'usg'],
+  [55.5, 150.4,151, 200, 'Unhealthy',    'bad'],
+  [150.5,250.4,201, 300, 'Very unhealthy','vbad'],
+  [250.5,500.4,301, 500, 'Hazardous',    'hazard'],
+];
+const US_PM10 = [
+  [0,   54,   0,  50, 'Good',          'good'],
+  [55,  154,  51, 100, 'Moderate',     'mod'],
+  [155, 254, 101, 150, 'USG',          'usg'],
+  [255, 354, 151, 200, 'Unhealthy',    'bad'],
+  [355, 424, 201, 300, 'Very unhealthy','vbad'],
+  [425, 604, 301, 500, 'Hazardous',    'hazard'],
+];
+const IN_PM25 = [
+  [0,   30,   0,  50, 'Good',         'good'],
+  [31,  60,   51, 100, 'Satisfactory','mod'],
+  [61,  90,  101, 200, 'Moderate',    'usg'],
+  [91,  120, 201, 300, 'Poor',        'bad'],
+  [121, 250, 301, 400, 'Very poor',   'vbad'],
+  [251, 500, 401, 500, 'Severe',      'hazard'],
+];
+const IN_PM10 = [
+  [0,   50,   0,  50, 'Good',         'good'],
+  [51,  100,  51, 100, 'Satisfactory','mod'],
+  [101, 250, 101, 200, 'Moderate',    'usg'],
+  [251, 350, 201, 300, 'Poor',        'bad'],
+  [351, 430, 301, 400, 'Very poor',   'vbad'],
+  [431, 600, 401, 500, 'Severe',      'hazard'],
+];
+
+function subIndex(c, table) {
+  if (c == null) return null;
+  for (const [cl, ch, il, ih, label, key] of table) {
+    if (c >= cl && c <= ch) {
+      const aqi = ((ih - il) / (ch - cl)) * (c - cl) + il;
+      return { aqi: Math.round(aqi), label, key };
+    }
+  }
+  // above max — clamp at top band
+  const top = table[table.length - 1];
+  return { aqi: top[3], label: top[4], key: top[5] };
+}
+
+function combineAqi(pm25, pm10, table25, table10) {
+  const a = subIndex(pm25, table25);
+  const b = subIndex(pm10, table10);
+  if (!a && !b) return null;
+  if (!a) return b;
+  if (!b) return a;
+  return a.aqi >= b.aqi ? a : b;
 }
 
 function setStatus(state, text) {
-  const dot = $('statusDot');
-  dot.className = 'dot ' + state;
+  $('statusDot').className = 'dot ' + state;
   $('statusText').textContent = text;
 }
 
-function renderCards(latest, intervalSec) {
-  const cards = $('cards');
+function cardHtml(label, value, unit, cat) {
+  const stripe = cat ? `<div class="stripe ${cat.key}"></div>` : '';
+  const badge = cat ? `<div><span class="badge ${cat.key}">${cat.label}</span></div>` : '';
+  return `
+    ${stripe}
+    <div class="label">${label}</div>
+    <div class="value">${value}<span class="unit">${unit}</span></div>
+    ${badge}
+  `;
+}
+
+function renderCards(latest) {
+  const pmCards = $('pmCards');
+  const aqiCards = $('aqiCards');
   if (!latest) {
-    cards.innerHTML = '<div class="empty" style="grid-column: 1/-1">No readings yet. Power on the ESP32.</div>';
+    pmCards.innerHTML = '<div class="empty" style="grid-column:1/-1">No readings yet. Power on the ESP32.</div>';
+    aqiCards.innerHTML = '';
     return;
   }
-  cards.innerHTML = `
-    <div class="card">
-      <div class="label">PM1.0</div>
-      <div class="value">${latest.pm1_0_atm}<span class="unit">µg/m³</span></div>
-    </div>
-    <div class="card">
-      <div class="label">PM2.5</div>
-      <div class="value">${latest.pm2_5_atm}<span class="unit">µg/m³</span></div>
-      ${pm25Badge(latest.pm2_5_atm)}
-    </div>
-    <div class="card">
-      <div class="label">PM10</div>
-      <div class="value">${latest.pm10_atm}<span class="unit">µg/m³</span></div>
-    </div>
-    <div class="card">
-      <div class="label">Interval</div>
-      <div class="value">${intervalSec ?? '—'}<span class="unit">s</span></div>
-    </div>
+  const pm1  = latest.pm1_0_atm;
+  const pm25 = latest.pm2_5_atm;
+  const pm10 = latest.pm10_atm;
+
+  const c1  = pmCategory('pm1',  pm1);
+  const c25 = pmCategory('pm25', pm25);
+  const c10 = pmCategory('pm10', pm10);
+
+  pmCards.innerHTML = `
+    <div class="card">${cardHtml('PM1.0', pm1, 'µg/m³', c1)}</div>
+    <div class="card">${cardHtml('PM2.5', pm25, 'µg/m³', c25)}</div>
+    <div class="card">${cardHtml('PM10', pm10, 'µg/m³', c10)}</div>
+  `;
+
+  const us = combineAqi(pm25, pm10, US_PM25, US_PM10);
+  const india = combineAqi(pm25, pm10, IN_PM25, IN_PM10);
+
+  aqiCards.innerHTML = `
+    <div class="card">${cardHtml('AQI (US EPA)', us ? us.aqi : '—', '', us)}</div>
+    <div class="card">${cardHtml('AQI (India CPCB)', india ? india.aqi : '—', '', india)}</div>
   `;
 }
 
@@ -315,7 +542,6 @@ function initCharts() {
 
 function updateCharts(rows) {
   const sorted = [...rows].sort((a, b) => a.ts - b.ts);
-  const t = sorted.map(r => new Date(r.ts * 1000));
   const pt = (k) => sorted.map(r => ({ x: new Date(r.ts * 1000), y: r[k] }));
 
   pmChart.data.datasets[0].data = pt('pm1_0_atm');
@@ -341,8 +567,15 @@ async function fetchAll() {
     if (!dataRes.ok) throw new Error('data ' + dataRes.status);
     const rows = await dataRes.json();
     const cfg = cfgRes.ok ? await cfgRes.json() : {};
+    serverInterval = cfg.interval_sec ?? null;
+    if (serverInterval && VALID_INTERVALS.includes(serverInterval)) {
+      const sel = $('intervalSelect');
+      if (parseInt(sel.value, 10) !== serverInterval && pendingInterval == null) {
+        sel.value = String(serverInterval);
+      }
+    }
     const latest = rows[0];
-    renderCards(latest, cfg.interval_sec);
+    renderCards(latest);
     updateCharts(rows);
     $('rowCount').textContent = `${rows.length} reading${rows.length === 1 ? '' : 's'}`;
     if (latest) {
@@ -360,14 +593,120 @@ async function fetchAll() {
   }
 }
 
-document.querySelectorAll('.controls button').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    const h = btn.dataset.hours;
-    currentHours = h ? parseInt(h, 10) : null;
-    fetchAll();
+/* ── Range buttons ── */
+$('rangeBtns').addEventListener('click', (ev) => {
+  const btn = ev.target.closest('button');
+  if (!btn) return;
+  document.querySelectorAll('#rangeBtns button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const h = btn.dataset.hours;
+  currentHours = h ? parseInt(h, 10) : null;
+  fetchAll();
+});
+
+/* ── Interval selector with confirm + auth ── */
+const fmtInterval = (s) => s >= 60 ? `${s / 60} min` : `${s} s`;
+
+function showToast(msg, ms = 2500) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.add('hidden'), ms);
+}
+
+function getCreds() {
+  const u = sessionStorage.getItem('dashUser');
+  const p = sessionStorage.getItem('dashPass');
+  return (u && p) ? { user: u, pass: p } : null;
+}
+
+function authHeader(c) {
+  return 'Basic ' + btoa(c.user + ':' + c.pass);
+}
+
+async function promptAuth() {
+  return new Promise((resolve) => {
+    const m = $('authModal');
+    const userIn = $('authUser');
+    const passIn = $('authPass');
+    userIn.value = sessionStorage.getItem('dashUser') || 'admin';
+    passIn.value = '';
+    m.classList.add('show');
+    setTimeout(() => passIn.focus(), 50);
+
+    const cleanup = () => {
+      m.classList.remove('show');
+      $('authOk').onclick = null;
+      $('authCancel').onclick = null;
+    };
+    $('authOk').onclick = () => {
+      const c = { user: userIn.value.trim(), pass: passIn.value };
+      if (!c.user || !c.pass) return;
+      sessionStorage.setItem('dashUser', c.user);
+      sessionStorage.setItem('dashPass', c.pass);
+      cleanup();
+      resolve(c);
+    };
+    $('authCancel').onclick = () => { cleanup(); resolve(null); };
   });
+}
+
+async function putInterval(sec) {
+  let creds = getCreds();
+  if (!creds) {
+    creds = await promptAuth();
+    if (!creds) return false;
+  }
+  const send = (c) => fetch('/api/config', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': authHeader(c),
+    },
+    body: JSON.stringify({ interval_sec: sec }),
+  });
+  let res = await send(creds);
+  if (res.status === 401) {
+    sessionStorage.removeItem('dashPass');
+    creds = await promptAuth();
+    if (!creds) return false;
+    res = await send(creds);
+  }
+  if (!res.ok) {
+    showToast(`Update failed (${res.status})`);
+    return false;
+  }
+  return true;
+}
+
+$('intervalSelect').addEventListener('change', (ev) => {
+  const sec = parseInt(ev.target.value, 10);
+  if (!VALID_INTERVALS.includes(sec)) return;
+  if (sec === serverInterval) return;
+  pendingInterval = sec;
+  $('confirmText').innerHTML = `Change ESP32 sampling to <strong>${fmtInterval(sec)}</strong>. Device will pick up the new value at its next config poll.`;
+  $('confirmModal').classList.add('show');
+});
+
+$('confirmCancel').addEventListener('click', () => {
+  $('confirmModal').classList.remove('show');
+  if (serverInterval) $('intervalSelect').value = String(serverInterval);
+  pendingInterval = null;
+});
+
+$('confirmOk').addEventListener('click', async () => {
+  $('confirmModal').classList.remove('show');
+  const sec = pendingInterval;
+  pendingInterval = null;
+  if (sec == null) return;
+  const ok = await putInterval(sec);
+  if (ok) {
+    showToast(`Interval set to ${fmtInterval(sec)}`);
+    fetchAll();
+  } else if (serverInterval) {
+    $('intervalSelect').value = String(serverInterval);
+  }
 });
 
 initCharts();
