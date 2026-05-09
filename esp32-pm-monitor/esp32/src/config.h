@@ -7,7 +7,7 @@
 // ─── Backend ─────────────────────────────────────────────────────────────────
 // Full URL of your deployed backend, no trailing slash
 // e.g. "https://pm-monitor.onrender.com" or "http://192.168.1.100:8000"
-#define SERVER_URL    "https://iitd-dsml-spotify-e9zvfutxd-shikharkohli-5189s-projects.vercel.app"
+#define SERVER_URL    "https://iitd-dsml-spotify.vercel.app"
 
 // API key – must match API_KEY env-var on the server
 #define API_KEY       "TESTKEY"
