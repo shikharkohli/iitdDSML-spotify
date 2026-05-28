@@ -1,8 +1,8 @@
-# ESP32 PM Monitor
+# Kohli Home AQI
 
-Real-time air quality monitor using an **ESP32** and **PMS7003** sensor.
-Data is pushed to a cloud backend and displayed on a password-protected,
-publicly accessible dashboard you can view from anywhere.
+Real-time air quality monitor using an **ESP32** and **PMS5003 / PMS7003** sensor.
+The ESP32 posts readings over HTTP to a **Vercel** backend backed by **Neon (PostgreSQL)**.
+Data is displayed on a dashboard at **<https://kohli-home-aqi.vercel.app>**.
 
 ---
 
@@ -21,13 +21,18 @@ publicly accessible dashboard you can view from anywhere.
 ## Architecture
 
 ```
-PMS7003 ──UART──▶ ESP32 ──WiFi──▶ Backend (Render/Fly.io)
-                                         │
-                                   SQLite DB
-                                         │
-                              Web Dashboard (HTTPS)
-                                   ↑ you browse from anywhere
+PMS5003/7003 ──UART──▶ ESP32 ──HTTP POST──▶ Vercel (FastAPI + pg8000)
+                                                      │
+                                               Neon PostgreSQL
+                                                      │
+                                          kohli-home-aqi.vercel.app
+                                             ↑ browse from anywhere
 ```
+
+The ESP32:
+- POSTs a sensor reading to `POST /api/data` every N seconds (default 5 min)
+- Receives updated config (`interval_sec`, `deep_sleep_enabled`) in the same response
+- GETs `GET /api/config` on first boot to sync config before the first sample
 
 ---
 
@@ -51,67 +56,23 @@ PMS7003 ──UART──▶ ESP32 ──WiFi──▶ Backend (Render/Fly.io)
 
 ---
 
-### Step 2 — Deploy the backend (free tier)
+### Step 2 — Deploy the backend (Vercel + Neon)
 
-Choose **Option A (Render)** or **Option B (Fly.io)**.
+1. Create a free account at <https://vercel.com> and import this repo.
+2. Set the **Root Directory** to `esp32-pm-monitor` in the Vercel project settings.
+3. Add a **Neon Postgres** integration (Storage tab → Connect) — Vercel sets `POSTGRES_URL` automatically.
+4. Add these **Environment Variables** in the Vercel dashboard:
 
-#### Option A — Render.com (easiest, free)
-
-1. Create a free account at <https://render.com>.
-2. Click **New → Web Service** → **Connect a Git repository** → select this repo.
-3. Set:
-   - **Root Directory**: `esp32-pm-monitor/backend`
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `uvicorn app:app --host 0.0.0.0 --port $PORT`
-   - **Instance Type**: Free
-4. Add a **Disk** (under Advanced):
-   - Name: `pm-data` | Mount path: `/data` | Size: 1 GB
-5. Add **Environment Variables**:
    | Key | Value |
    |---|---|
-   | `DB_PATH` | `/data/pm_data.db` |
-   | `API_KEY` | _generate a random string, e.g. `openssl rand -hex 16`_ |
+   | `API_KEY` | random string — `openssl rand -hex 16` |
    | `DASH_USER` | `admin` (or your choice) |
-   | `DASH_PASS` | _strong password_ |
+   | `DASH_PASS` | strong password |
    | `MAX_RECORDS` | `10000` |
-6. Click **Create Web Service**. Render builds and deploys.
-7. Note your URL: `https://pm-monitor-xxxx.onrender.com`
 
-> **Free tier note**: Render spins down idle services after 15 min.
-> The ESP32's regular pings keep it awake.
+5. Deploy. Your URL: `https://<project>.vercel.app`
 
----
-
-#### Option B — Fly.io (more reliable free tier)
-
-1. Install the Fly CLI: <https://fly.io/docs/hands-on/install-flyctl/>
-2. Sign up / log in:
-   ```bash
-   fly auth signup   # or: fly auth login
-   ```
-3. From the `esp32-pm-monitor/` directory:
-   ```bash
-   fly launch --config fly.toml --no-deploy
-   ```
-   - Accept the generated app name or enter your own.
-   - Choose region closest to you (`bom` = Mumbai, `sin` = Singapore, `lhr` = London).
-4. Create a volume for persistent data:
-   ```bash
-   fly volumes create pm_data --region sin --size 1
-   ```
-5. Set secrets:
-   ```bash
-   fly secrets set \
-     API_KEY="$(openssl rand -hex 16)" \
-     DASH_USER="admin" \
-     DASH_PASS="$(openssl rand -hex 8)"
-   ```
-   **Copy these values — you'll need `API_KEY` for the ESP32.**
-6. Deploy:
-   ```bash
-   fly deploy
-   ```
-7. Your URL: `https://pm-monitor.fly.dev`
+> Tables are created automatically on first request. No manual DB setup needed.
 
 ---
 
@@ -122,16 +83,17 @@ Choose **Option A (Render)** or **Option B (Fly.io)**.
 1. Install [VS Code](https://code.visualstudio.com) + the
    [PlatformIO extension](https://platformio.org/install/ide?install=vscode).
 2. Open the `esp32-pm-monitor/esp32/` folder in VS Code.
-3. Copy `pm_monitor/config.h.example` → `pm_monitor/config.h`.
+3. Copy `src/config.h.example` → `src/config.h`.
 4. Edit `config.h`:
    ```c
    #define WIFI_SSID     "YourWiFiName"
    #define WIFI_PASSWORD "YourWiFiPassword"
-   #define SERVER_URL    "https://pm-monitor.fly.dev"   // your backend URL
+   #define SERVER_URL    "https://your-project.vercel.app"  // no trailing slash
    #define API_KEY       "the-api-key-from-step-2"
+   #define SENSOR_MODEL  5003   // or 7003
    ```
 5. Connect the ESP32 via USB.
-6. Click **Upload** (→ button) in PlatformIO.
+6. Click **Upload** (→ button) in PlatformIO or run `pio run -t upload`.
 
 #### Using Arduino IDE
 
@@ -141,23 +103,22 @@ Choose **Option A (Render)** or **Option B (Fly.io)**.
      `https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json`
    - Tools → Board → Boards Manager → search "esp32" → Install.
 3. Install library: Sketch → Include Library → Manage → search **ArduinoJson** → Install.
-4. Open `esp32/pm_monitor/pm_monitor.ino`.
-5. Create `config.h` from the example (see above).
-6. Select board: **ESP32 Dev Module** | Upload speed: **921600**.
-7. Upload.
+4. Open `esp32/src/pm_monitor.ino` and create `src/config.h` as above.
+5. Select board: **ESP32 Dev Module** | Upload speed: **921600**.
+6. Upload.
 
 ---
 
 ### Step 4 — View the dashboard
 
-Open your backend URL in any browser (desktop or mobile):
+Open in any browser (desktop or mobile):
 
 ```
-https://pm-monitor.fly.dev
+https://your-project.vercel.app
 ```
 
-You'll be prompted for `DASH_USER` / `DASH_PASS`.  
-The dashboard auto-refreshes every 30 seconds.
+Interval and deep sleep settings require `DASH_USER` / `DASH_PASS`.  
+The dashboard auto-refreshes every 15 seconds.
 
 ---
 
@@ -175,25 +136,25 @@ The dashboard auto-refreshes every 30 seconds.
 
 ## API reference
 
-All endpoints accept `X-API-Key: <key>` header OR HTTP Basic Auth.
-
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | `/api/data` | API key | ESP32 posts a reading |
-| GET | `/api/data?hours=24&limit=500` | Any | Retrieve readings |
-| GET | `/api/config` | Any | Get config `{"interval_sec": N, "deep_sleep_enabled": bool}` |
-| PUT | `/api/config` | Basic Auth | Set interval and/or deep sleep `{"interval_sec": 300, "deep_sleep_enabled": true}` |
-| GET | `/` | Basic Auth | Dashboard |
+| POST | `/api/data` | `X-API-Key` header | ESP32 posts a reading; response includes current config |
+| GET | `/api/data?hours=24&limit=500` | none | Retrieve historical readings |
+| GET | `/api/config` | none | Get config `{"interval_sec": N, "deep_sleep_enabled": bool}` |
+| PUT | `/api/config` | Basic Auth | Update interval and/or deep sleep `{"interval_sec": 300, "deep_sleep_enabled": true}` |
+| GET | `/api/health` | none | Health check |
+| GET | `/` | none | Dashboard |
 
 ---
 
 ## Local development
 
 ```bash
-cd esp32-pm-monitor/backend
+cd esp32-pm-monitor
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install fastapi pg8000 uvicorn
 
+export DATABASE_URL="postgresql://user:pass@host/db?sslmode=require"
 export API_KEY=dev DASH_USER=admin DASH_PASS=dev
 python app.py
 # → http://localhost:8000
@@ -207,7 +168,7 @@ curl -X POST http://localhost:8000/api/data \
   -d '{"pm1_0_std":5,"pm2_5_std":12,"pm10_std":18,
        "pm1_0_atm":4,"pm2_5_atm":11,"pm10_atm":17,
        "cnt_0_3um":1200,"cnt_0_5um":350,"cnt_1_0um":80,
-       "cnt_2_5um":20,"cnt_5_0um":4,"cnt_10um":1}'
+       "cnt_2_5um":20,"cnt_5_0um":4}'
 ```
 
 ---
