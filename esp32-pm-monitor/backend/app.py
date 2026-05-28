@@ -241,17 +241,12 @@ def post_data(reading: Reading):
             (MAX_RECORDS,),
         )
         conn.commit()
+        # Fetch config on same connection — no race, single round-trip
+        cur.execute("SELECT key, value FROM config WHERE key IN ('interval_sec', 'deep_sleep_enabled')")
+        cfg = {r[0]: r[1] for r in cur.fetchall()}
         cur.close()
     finally:
         conn.close()
-    conn2 = get_db()
-    try:
-        cur2 = conn2.cursor()
-        cur2.execute("SELECT key, value FROM config WHERE key IN ('interval_sec', 'deep_sleep_enabled')")
-        cfg = {r[0]: r[1] for r in cur2.fetchall()}
-        cur2.close()
-    finally:
-        conn2.close()
     return {
         "status": "ok",
         "interval_sec": int(cfg.get("interval_sec", "30")),
