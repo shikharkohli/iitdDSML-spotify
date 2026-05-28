@@ -35,14 +35,19 @@ PMS7003 ──UART──▶ ESP32 ──WiFi──▶ Backend (Render/Fly.io)
 
 ### Step 1 — Wire the hardware
 
-| PMS7003 pin | ESP32 pin |
-|---|---|
-| VCC | 5 V |
-| GND | GND |
-| TX  | GPIO 16 (configurable) |
-| RX  | GPIO 17 (configurable) |
-| SET | 3.3 V (keep HIGH = active mode) |
-| RST | 3.3 V (keep HIGH) |
+| PMS5003 / PMS7003 pin | ESP32 pin | Notes |
+|---|---|---|
+| VCC | 5 V | |
+| GND | GND | |
+| TX  | GPIO 16 | `PMS_RX_PIN` in config.h |
+| RX  | GPIO 17 | `PMS_TX_PIN` in config.h |
+| SET | **GPIO 25** | `PMS_SET_PIN` — controls deep sleep standby |
+| RST | 3.3 V | keep HIGH |
+
+> **Deep sleep wiring:** `SET` must be wired to **GPIO 25** (not 3.3 V) to enable deep sleep mode.
+> When deep sleep is off, the pin is held HIGH continuously (same as tying to 3.3 V).
+> Toggling deep sleep from the dashboard requires this rewire — without it the sensor
+> fan and laser run 24/7 regardless of firmware settings.
 
 ---
 
@@ -158,15 +163,13 @@ The dashboard auto-refreshes every 30 seconds.
 
 ## Dashboard features
 
-- **7 themes** — Midnight, Aurora, Sunset, Ocean, Rose Quartz, Light, Cyberpunk  
-  (choice persists in `localStorage`)
-- **All 12 PM + particle-count values** shown as live stat cards  
-- **PM2.5 AQI colour coding** — green / amber / red based on US EPA thresholds
-- **Dual-mode charts** — Standard (CF=1), Atmospheric, or Both overlaid
-- **Particle count chart** for all 6 size bins
-- **Time range selector** — 1 h, 6 h, 24 h, 3 d, 7 d, All
-- **Sampling interval control** with presets (1 min → 1 hr) and custom input  
-  ESP32 picks up changes within 60 seconds
+- **Light / dark theme** — Apple HIG design system, follows system preference (toggle in header)
+- **AQI cards** — US EPA and India CPCB AQI calculated from PM2.5 + PM10
+- **PM cards** — PM1.0 / PM2.5 / PM10 with healthy / unhealthy tags
+- **PM and particle-count charts** — time-range selector (1 h → All)
+- **Sampling interval selector** — 30 s / 1 min / 15 min / 30 min (requires auth)
+- **Deep sleep toggle** — put ESP32 into deep sleep between readings to extend sensor laser life  
+  Requires `SET` pin rewired to GPIO 25 (see wiring above). Disables intervals < 2 min.
 
 ---
 
@@ -178,8 +181,8 @@ All endpoints accept `X-API-Key: <key>` header OR HTTP Basic Auth.
 |---|---|---|---|
 | POST | `/api/data` | API key | ESP32 posts a reading |
 | GET | `/api/data?hours=24&limit=500` | Any | Retrieve readings |
-| GET | `/api/config` | Any | Get current interval |
-| PUT | `/api/config` | Any | Set interval `{"interval_sec": 300}` |
+| GET | `/api/config` | Any | Get config `{"interval_sec": N, "deep_sleep_enabled": bool}` |
+| PUT | `/api/config` | Basic Auth | Set interval and/or deep sleep `{"interval_sec": 300, "deep_sleep_enabled": true}` |
 | GET | `/` | Basic Auth | Dashboard |
 
 ---
