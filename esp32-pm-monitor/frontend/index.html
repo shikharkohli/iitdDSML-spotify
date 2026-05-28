@@ -1072,8 +1072,9 @@ $('deepSleepCheck').addEventListener('change', async (ev) => {
     const label = enabled ? 'Deep sleep on — sensor life extended' : 'Deep sleep off — continuous mode';
     showToast(label);
     if (enabled && serverInterval && serverInterval < MIN_DEEP_SLEEP_INTERVAL) {
-      await putInterval(MIN_DEEP_SLEEP_INTERVAL);
-      showToast('Interval raised to 2 min (deep sleep minimum)', 3500);
+      const safeInterval = VALID_INTERVALS.find(i => i >= MIN_DEEP_SLEEP_INTERVAL) ?? 900;
+      await putInterval(safeInterval);
+      showToast(`Interval raised to ${fmtInterval(safeInterval)} (deep sleep minimum)`, 3500);
       fetchAll();
     }
   } else {
