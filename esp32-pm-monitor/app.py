@@ -325,6 +325,11 @@ def get_config():
 def put_config(update: ConfigUpdate):
     if update.interval_sec is None and update.deep_sleep_enabled is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Provide interval_sec or deep_sleep_enabled")
+    if update.deep_sleep_enabled and update.interval_sec is not None and update.interval_sec < 120:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "interval_sec must be >= 120 when deep_sleep_enabled is true",
+        )
     conn = get_db()
     try:
         cur = conn.cursor()

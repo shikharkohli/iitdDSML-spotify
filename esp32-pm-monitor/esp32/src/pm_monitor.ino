@@ -357,7 +357,7 @@ void setup() {
     wifiConnect();
     if (!g_rtcValid) {
         fetchConfig();
-        g_rtcValid = true;
+        g_rtcValid = true;  // POST /api/data responses piggyback config on success
     }
     g_lastConfigMs = millis();
 #endif
