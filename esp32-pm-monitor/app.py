@@ -131,6 +131,10 @@ async def lifespan(app: FastAPI):
             "ON CONFLICT (key) DO UPDATE SET value = '30' "
             "WHERE config.value = '1800'"
         )
+        cur.execute(
+            "INSERT INTO config (key, value) VALUES ('deep_sleep_enabled', '0') "
+            "ON CONFLICT (key) DO NOTHING"
+        )
         conn.commit()
         cur.close()
         conn.close()
@@ -202,7 +206,8 @@ class Reading(BaseModel):
 
 
 class ConfigUpdate(BaseModel):
-    interval_sec: int = Field(..., ge=10, le=86400)
+    interval_sec: Optional[int] = Field(None, ge=10, le=86400)
+    deep_sleep_enabled: Optional[bool] = None
 
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
@@ -248,7 +253,19 @@ def post_data(reading: Reading):
         cur.close()
     finally:
         conn.close()
-    return {"status": "ok"}
+    conn2 = get_db()
+    try:
+        cur2 = conn2.cursor()
+        cur2.execute("SELECT key, value FROM config WHERE key IN ('interval_sec', 'deep_sleep_enabled')")
+        cfg = {r[0]: r[1] for r in cur2.fetchall()}
+        cur2.close()
+    finally:
+        conn2.close()
+    return {
+        "status": "ok",
+        "interval_sec": int(cfg.get("interval_sec", "30")),
+        "deep_sleep_enabled": cfg.get("deep_sleep_enabled", "0") == "1",
+    }
 
 
 @app.get("/api/data")
@@ -298,28 +315,41 @@ def get_config():
     conn = get_db()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT value FROM config WHERE key='interval_sec'")
-        row = cur.fetchone()
+        cur.execute("SELECT key, value FROM config WHERE key IN ('interval_sec', 'deep_sleep_enabled')")
+        rows = {r[0]: r[1] for r in cur.fetchall()}
         cur.close()
     finally:
         conn.close()
-    return {"interval_sec": int(row[0]) if row else 30}
+    return {
+        "interval_sec": int(rows.get("interval_sec", "30")),
+        "deep_sleep_enabled": rows.get("deep_sleep_enabled", "0") == "1",
+    }
 
 
 @app.put("/api/config", dependencies=[Depends(require_basic_auth)])
 def put_config(update: ConfigUpdate):
+    if update.interval_sec is None and update.deep_sleep_enabled is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Provide interval_sec or deep_sleep_enabled")
     conn = get_db()
     try:
         cur = conn.cursor()
-        cur.execute(
-            "INSERT INTO config (key, value) VALUES ('interval_sec', %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
-            (str(update.interval_sec),),
-        )
+        if update.interval_sec is not None:
+            cur.execute(
+                "INSERT INTO config (key, value) VALUES ('interval_sec', %s) "
+                "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+                (str(update.interval_sec),),
+            )
+        if update.deep_sleep_enabled is not None:
+            cur.execute(
+                "INSERT INTO config (key, value) VALUES ('deep_sleep_enabled', %s) "
+                "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+                ("1" if update.deep_sleep_enabled else "0",),
+            )
         conn.commit()
         cur.close()
     finally:
         conn.close()
-    return {"interval_sec": update.interval_sec}
+    return get_config()
 
 
 if __name__ == "__main__":
