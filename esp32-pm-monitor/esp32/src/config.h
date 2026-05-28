@@ -24,6 +24,11 @@
 #define PMS_RX_PIN    16   // ESP32 pin connected to sensor TX
 #define PMS_TX_PIN    17   // ESP32 pin connected to sensor RX
 
+// ─── PMS sensor SET pin (active-high = sensor on, active-low = standby) ──────
+// Rewire: desolder SET-to-3.3V jumper, connect SET → this GPIO.
+// Set to -1 to disable SET pin management (sensor always on).
+#define PMS_SET_PIN   25
+
 // ─── Standalone / local-only mode ────────────────────────────────────────────
 // Set to 1 to read and print PM values over Serial WITHOUT connecting to WiFi
 // or posting to the backend.  Use this to verify your sensor wiring with
@@ -35,4 +40,6 @@
 // Default sampling interval in seconds.
 // In STANDALONE_MODE this is the print interval (minimum 10 s recommended).
 // In cloud mode it is overridden by the server config.
-#define DEFAULT_INTERVAL_SEC  30   // 30 s — overridden by server config in cloud mode
+// In deep-sleep mode minimum interval is 120 s (30 s sensor warmup + margin).
+// Values < 120 s force continuous mode regardless of deep_sleep_enabled setting.
+#define DEFAULT_INTERVAL_SEC  300   // 5 min — safe for deep sleep, overridden by server
