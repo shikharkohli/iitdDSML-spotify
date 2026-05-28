@@ -107,7 +107,17 @@ static constexpr uint32_t SENSOR_WARMUP_MS        = 30000UL;
 static constexpr uint32_t CONFIG_POLL_INTERVAL_MS = 60000UL;
 
 // ─── Runtime state ───────────────────────────────────────────────────────────
-static uint32_t g_intervalSec  = DEFAULT_INTERVAL_SEC;
+#if !STANDALONE_MODE
+#include <esp_sleep.h>
+
+// RTC slow RAM: survives deep sleep, cleared on power-cycle/hard reset
+RTC_DATA_ATTR static uint32_t g_intervalSec      = DEFAULT_INTERVAL_SEC;
+RTC_DATA_ATTR static bool     g_deepSleepEnabled = false;
+RTC_DATA_ATTR static bool     g_rtcValid         = false;
+#else
+static uint32_t g_intervalSec = DEFAULT_INTERVAL_SEC;
+#endif
+
 static uint32_t g_lastSampleMs = 0;
 #if !STANDALONE_MODE
 static uint32_t g_lastConfigMs = 0;
@@ -179,6 +189,20 @@ bool readPmsFrame(PmsData &out, uint32_t timeoutMs = 6000) {
     return false;
 }
 
+// ─── SET pin control (no-op if PMS_SET_PIN not defined or -1) ────────────────
+#if defined(PMS_SET_PIN) && PMS_SET_PIN >= 0
+  static void sensorOn()  { digitalWrite(PMS_SET_PIN, HIGH); }
+  static void sensorOff() { digitalWrite(PMS_SET_PIN, LOW);  }
+  static void initSetPin() {
+    pinMode(PMS_SET_PIN, OUTPUT);
+    sensorOn();
+  }
+#else
+  static void sensorOn()  {}
+  static void sensorOff() {}
+  static void initSetPin() {}
+#endif
+
 // ─── WiFi / HTTP — compiled out when STANDALONE_MODE = 1 ─────────────────────
 #if !STANDALONE_MODE
 
@@ -231,9 +255,28 @@ bool postData(const PmsData &d) {
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-API-Key", API_KEY);
     int code = http.POST(body);
-    http.end();
 
-    Serial.printf("[HTTP] POST /api/data → %d\n", code);
+    if (code == 200 || code == 201) {
+        JsonDocument resp;
+        DeserializationError err = deserializeJson(resp, http.getStream());
+        if (!err) {
+            uint32_t newSec = resp["interval_sec"] | g_intervalSec;
+            if (newSec >= 10 && newSec != g_intervalSec) {
+                Serial.printf("[Config] interval %u → %u s\n", g_intervalSec, newSec);
+                g_intervalSec = newSec;
+            }
+            bool newDs = resp["deep_sleep_enabled"] | g_deepSleepEnabled;
+            if (newDs != g_deepSleepEnabled) {
+                Serial.printf("[Config] deep_sleep %s → %s\n",
+                    g_deepSleepEnabled ? "on" : "off",
+                    newDs ? "on" : "off");
+                g_deepSleepEnabled = newDs;
+            }
+        }
+    }
+    http.end();
+    Serial.printf("[HTTP] POST /api/data → %d  interval=%u s  deep_sleep=%s\n",
+                  code, g_intervalSec, g_deepSleepEnabled ? "on" : "off");
     return (code == 200 || code == 201);
 }
 
@@ -255,6 +298,12 @@ void fetchConfig() {
                 Serial.printf("[Config] Interval %u → %u s\n", g_intervalSec, newSec);
                 g_intervalSec = newSec;
             }
+            bool newDs = doc["deep_sleep_enabled"] | g_deepSleepEnabled;
+            if (newDs != g_deepSleepEnabled) {
+                Serial.printf("[Config] deep_sleep %s → %s\n",
+                    g_deepSleepEnabled ? "on" : "off", newDs ? "on" : "off");
+                g_deepSleepEnabled = newDs;
+            }
         }
     }
 
@@ -263,6 +312,22 @@ void fetchConfig() {
 }
 
 #endif  // !STANDALONE_MODE
+
+#if !STANDALONE_MODE
+static bool useDeepSleep() {
+    return g_deepSleepEnabled && g_intervalSec >= 120;
+}
+
+static void doDeepSleep() {
+    uint64_t sleepUs = (uint64_t)g_intervalSec * 1000000ULL;
+    Serial.printf("[Sleep] deep sleep %u s\n", g_intervalSec);
+    Serial.flush();
+    sensorOff();
+    delay(100);
+    esp_sleep_enable_timer_wakeup(sleepUs);
+    esp_deep_sleep_start();
+}
+#endif
 
 // ─── setup ───────────────────────────────────────────────────────────────────
 void setup() {
@@ -273,6 +338,7 @@ void setup() {
     // Both PMS5003 and PMS7003 use 9600 baud, 8N1
     Serial2.begin(9600, SERIAL_8N1, PMS_RX_PIN, PMS_TX_PIN);
     Serial.printf("[PMS]  UART on GPIO RX=%d  TX=%d\n", PMS_RX_PIN, PMS_TX_PIN);
+    initSetPin();
 
     // Fan warmup — datasheet requires ~30 s before readings are stable
     Serial.printf("[PMS]  Warming up (%lu s)", SENSOR_WARMUP_MS / 1000);
@@ -289,8 +355,11 @@ void setup() {
 #else
     WiFi.mode(WIFI_STA);
     wifiConnect();
-    fetchConfig();
-    g_lastConfigMs = millis();  // prevent immediate re-poll on first loop()
+    if (!g_rtcValid) {
+        fetchConfig();
+        g_rtcValid = true;
+    }
+    g_lastConfigMs = millis();
 #endif
 
     g_lastSampleMs = millis();
@@ -298,55 +367,83 @@ void setup() {
 
 // ─── loop ────────────────────────────────────────────────────────────────────
 void loop() {
+#if STANDALONE_MODE
     uint32_t now = millis();
-
-#if !STANDALONE_MODE
-    // Poll server for updated interval every CONFIG_POLL_INTERVAL_MS
-    if (now - g_lastConfigMs >= CONFIG_POLL_INTERVAL_MS) {
-        g_lastConfigMs = now;
-        fetchConfig();
-    }
-#endif
-
     if (now - g_lastSampleMs >= g_intervalSec * 1000UL) {
         Serial.printf("\n[Sample] Reading PMS%d...\n", SENSOR_MODEL);
-
-        // Discard frames that built up while idle, then wait for a fresh one
         while (Serial2.available()) Serial2.read();
         delay(10);
-
         PmsData data;
         if (readPmsFrame(data)) {
-            // Always print to serial — visible in both standalone and cloud modes
             Serial.printf("[PMS] std  PM1.0=%-4u  PM2.5=%-4u  PM10=%-4u  µg/m³\n",
                           data.pm1_0_std, data.pm2_5_std, data.pm10_std);
             Serial.printf("[PMS] atm  PM1.0=%-4u  PM2.5=%-4u  PM10=%-4u  µg/m³\n",
                           data.pm1_0_atm, data.pm2_5_atm, data.pm10_atm);
-            if (HAS_CNT_10UM) {
-                Serial.printf("[PMS] cnt  >0.3=%-6u  >0.5=%-6u  >1.0=%-6u  >2.5=%-6u  >5.0=%-6u  >10=%-6u  /0.1L\n",
-                              data.cnt_0_3um, data.cnt_0_5um, data.cnt_1_0um,
-                              data.cnt_2_5um, data.cnt_5_0um, data.cnt_10um);
-            } else {
-                Serial.printf("[PMS] cnt  >0.3=%-6u  >0.5=%-6u  >1.0=%-6u  >2.5=%-6u  >5.0=%-6u  /0.1L\n",
-                              data.cnt_0_3um, data.cnt_0_5um, data.cnt_1_0um,
-                              data.cnt_2_5um, data.cnt_5_0um);
-            }
-
-#if STANDALONE_MODE
             g_lastSampleMs = millis();
-#else
-            if (postData(data)) {
-                g_lastSampleMs = millis();
-            } else {
-                Serial.println("[HTTP] POST failed — retrying in 30 s");
-                g_lastSampleMs = millis() - (g_intervalSec * 1000UL) + 30000UL;
-            }
-#endif
         } else {
             Serial.println("[PMS] Read failed — retrying in 30 s");
             g_lastSampleMs = millis() - (g_intervalSec * 1000UL) + 30000UL;
         }
     }
-
     delay(100);
+
+#else
+    uint32_t now = millis();
+
+    if (useDeepSleep()) {
+        Serial.printf("\n[Sample] Reading PMS%d (deep sleep mode)...\n", SENSOR_MODEL);
+        while (Serial2.available()) Serial2.read();
+        delay(10);
+        PmsData data;
+        if (readPmsFrame(data)) {
+            Serial.printf("[PMS] atm  PM1.0=%-4u  PM2.5=%-4u  PM10=%-4u  µg/m³\n",
+                          data.pm1_0_atm, data.pm2_5_atm, data.pm10_atm);
+            if (!postData(data)) {
+                Serial.println("[HTTP] POST failed — retry in 30 s then sleep");
+                delay(30000);
+                postData(data);
+            }
+        } else {
+            Serial.println("[PMS] Read failed — sleeping anyway");
+        }
+        doDeepSleep();
+
+    } else {
+        if (now - g_lastConfigMs >= CONFIG_POLL_INTERVAL_MS) {
+            g_lastConfigMs = now;
+            fetchConfig();
+        }
+        if (now - g_lastSampleMs >= g_intervalSec * 1000UL) {
+            Serial.printf("\n[Sample] Reading PMS%d...\n", SENSOR_MODEL);
+            while (Serial2.available()) Serial2.read();
+            delay(10);
+            PmsData data;
+            if (readPmsFrame(data)) {
+                Serial.printf("[PMS] std  PM1.0=%-4u  PM2.5=%-4u  PM10=%-4u  µg/m³\n",
+                              data.pm1_0_std, data.pm2_5_std, data.pm10_std);
+                Serial.printf("[PMS] atm  PM1.0=%-4u  PM2.5=%-4u  PM10=%-4u  µg/m³\n",
+                              data.pm1_0_atm, data.pm2_5_atm, data.pm10_atm);
+                if (HAS_CNT_10UM) {
+                    Serial.printf("[PMS] cnt  >0.3=%-6u  >0.5=%-6u  >1.0=%-6u  >2.5=%-6u  >5.0=%-6u  >10=%-6u  /0.1L\n",
+                                  data.cnt_0_3um, data.cnt_0_5um, data.cnt_1_0um,
+                                  data.cnt_2_5um, data.cnt_5_0um, data.cnt_10um);
+                } else {
+                    Serial.printf("[PMS] cnt  >0.3=%-6u  >0.5=%-6u  >1.0=%-6u  >2.5=%-6u  >5.0=%-6u  /0.1L\n",
+                                  data.cnt_0_3um, data.cnt_0_5um, data.cnt_1_0um,
+                                  data.cnt_2_5um, data.cnt_5_0um);
+                }
+                if (postData(data)) {
+                    g_lastSampleMs = millis();
+                } else {
+                    Serial.println("[HTTP] POST failed — retrying in 30 s");
+                    g_lastSampleMs = millis() - (g_intervalSec * 1000UL) + 30000UL;
+                }
+            } else {
+                Serial.println("[PMS] Read failed — retrying in 30 s");
+                g_lastSampleMs = millis() - (g_intervalSec * 1000UL) + 30000UL;
+            }
+        }
+        delay(100);
+    }
+#endif
 }
