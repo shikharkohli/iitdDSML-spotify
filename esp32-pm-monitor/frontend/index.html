@@ -463,6 +463,24 @@
     .toolbar { gap: 14px; }
     .segmented button { padding: 6px 11px; font-size: 13px; }
   }
+
+  /* Deep sleep toggle — Apple-style pill switch */
+  .ds-toggle { display: inline-flex; align-items: center; cursor: pointer; }
+  .ds-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .ds-track {
+    position: relative; width: 44px; height: 26px;
+    background: var(--divider); border-radius: 13px;
+    transition: background .2s;
+  }
+  .ds-toggle input:checked + .ds-track { background: var(--accent); }
+  .ds-thumb {
+    position: absolute; top: 3px; left: 3px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3);
+    transition: transform .2s;
+  }
+  .ds-toggle input:checked + .ds-track .ds-thumb { transform: translateX(18px); }
+  .ds-toggle input:disabled + .ds-track { opacity: .4; cursor: default; }
 </style>
 </head>
 <body>
@@ -502,6 +520,13 @@
         <option value="900">15 min</option>
         <option value="1800">30 min</option>
       </select>
+    </div>
+    <div class="toolbar-group">
+      <span class="toolbar-label">Deep sleep</span>
+      <label class="ds-toggle" title="Enable ESP32 deep sleep between readings to extend sensor life">
+        <input type="checkbox" id="deepSleepCheck" />
+        <span class="ds-track"><span class="ds-thumb"></span></span>
+      </label>
     </div>
   </div>
 
@@ -569,6 +594,8 @@ let currentHours = 24;
 let pmChart, cntChart;
 let serverInterval = null; // last known from server
 let pendingInterval = null;
+let serverDeepSleep = null;
+const MIN_DEEP_SLEEP_INTERVAL = 120;
 
 const $ = (id) => document.getElementById(id);
 
@@ -828,6 +855,21 @@ function updateCharts(rows) {
   cntChart.update('none');
 }
 
+function syncIntervalOptions(deepSleepOn) {
+  const sel = $('intervalSelect');
+  for (const opt of sel.options) {
+    const sec = parseInt(opt.value, 10);
+    const incompatible = deepSleepOn && sec < MIN_DEEP_SLEEP_INTERVAL;
+    opt.disabled = incompatible;
+    opt.title = incompatible ? 'Requires interval ≥ 2 min when deep sleep is on' : '';
+  }
+  const cur = parseInt(sel.value, 10);
+  if (deepSleepOn && cur < MIN_DEEP_SLEEP_INTERVAL) {
+    const first = [...sel.options].find(o => !o.disabled);
+    if (first) sel.value = first.value;
+  }
+}
+
 async function fetchAll() {
   try {
     const qs = currentHours ? `?hours=${currentHours}&limit=2000` : `?limit=2000`;
@@ -839,11 +881,16 @@ async function fetchAll() {
     const rows = await dataRes.json();
     const cfg = cfgRes.ok ? await cfgRes.json() : {};
     serverInterval = cfg.interval_sec ?? null;
+    serverDeepSleep = cfg.deep_sleep_enabled ?? false;
     if (serverInterval && VALID_INTERVALS.includes(serverInterval)) {
       const sel = $('intervalSelect');
       if (parseInt(sel.value, 10) !== serverInterval && pendingInterval == null) {
         sel.value = String(serverInterval);
       }
+    }
+    if (pendingInterval == null) {
+      $('deepSleepCheck').checked = serverDeepSleep;
+      syncIntervalOptions(serverDeepSleep);
     }
     const latest = rows[0];
     renderCards(latest);
@@ -955,6 +1002,34 @@ async function putInterval(sec) {
   return true;
 }
 
+async function putDeepSleep(enabled) {
+  let creds = getCreds();
+  if (!creds) {
+    creds = await promptAuth();
+    if (!creds) return false;
+  }
+  const send = (c) => fetch('/api/config', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': authHeader(c),
+    },
+    body: JSON.stringify({ deep_sleep_enabled: enabled }),
+  });
+  let res = await send(creds);
+  if (res.status === 401) {
+    sessionStorage.removeItem('dashPass');
+    creds = await promptAuth();
+    if (!creds) return false;
+    res = await send(creds);
+  }
+  if (!res.ok) {
+    showToast(`Update failed (${res.status})`);
+    return false;
+  }
+  return true;
+}
+
 $('intervalSelect').addEventListener('change', (ev) => {
   const sec = parseInt(ev.target.value, 10);
   if (!VALID_INTERVALS.includes(sec)) return;
@@ -981,6 +1056,28 @@ $('confirmOk').addEventListener('click', async () => {
     fetchAll();
   } else if (serverInterval) {
     $('intervalSelect').value = String(serverInterval);
+  }
+});
+
+$('deepSleepCheck').addEventListener('change', async (ev) => {
+  const enabled = ev.target.checked;
+  ev.target.checked = !enabled;
+  $('deepSleepCheck').disabled = true;
+  const ok = await putDeepSleep(enabled);
+  $('deepSleepCheck').disabled = false;
+  if (ok) {
+    serverDeepSleep = enabled;
+    $('deepSleepCheck').checked = enabled;
+    syncIntervalOptions(enabled);
+    const label = enabled ? 'Deep sleep on — sensor life extended' : 'Deep sleep off — continuous mode';
+    showToast(label);
+    if (enabled && serverInterval && serverInterval < MIN_DEEP_SLEEP_INTERVAL) {
+      await putInterval(MIN_DEEP_SLEEP_INTERVAL);
+      showToast('Interval raised to 2 min (deep sleep minimum)', 3500);
+      fetchAll();
+    }
+  } else {
+    $('deepSleepCheck').checked = !enabled;
   }
 });
 
